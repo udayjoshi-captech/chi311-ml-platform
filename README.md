@@ -209,7 +209,7 @@ chi311-intelligence-platform/
 │   ├── DATA_SOURCING.md                # Data source documentation
 │   ├── ARCHITECTURE_DECISIONS.md       # ADRs and alternatives considered
 │   ├── PIPELINE_EXPLAINED.md           # Beginner-friendly pipeline guide
-│   └── COST_ANALYSIS.md               # Azure cost breakdown
+│   └── COST_ANALYSIS.md                # Azure cost breakdown
 │
 ├── notebooks/
 │   ├── 01_setup/
