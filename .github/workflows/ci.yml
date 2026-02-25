@@ -1,0 +1,142 @@
+# ==========================================================================
+# CI/CD Pipeline - Azure Databricks
+# ==========================================================================
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+  DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+  DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+jobs:
+  # ========================================================================
+  # Code Quality
+  # ========================================================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/checkout@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION}}
+      
+      - name: Install dependencies
+        run: |
+          pip install - r requirement-dev.txt
+
+      - name: Lint with ruff
+        run: ruff check src/ tests/
+
+      - name: Format check with black
+        run: black --check src/ tests/ 
+
+      - name: Type check with mypy 
+        run: mypy src/ --ignore-missing-imports
+        continue-on-error: true
+  
+  # ========================================================================
+  # Unit Tests
+  # ========================================================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: code-quality 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirement-dev.txt
+          pip install -e .
+
+      - name: Run tests 
+        run: | 
+          pytest tests/unit -v --tb=short --cov=src/chi311 --cov-report=xml
+
+      - name: Upload coverage 
+        uses: actions/upload-artifact@v4 
+        with:
+          name: coverage-report
+          path: coverage.xml 
+  
+  # ========================================================================
+  # Deploy to Dev
+  # ========================================================================
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    if: github.ref == 'refs/heads/main'
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4 
+
+      - name: Set up Python 
+        uses: actions/setup-python@v5 
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Databricks CLI 
+        run: pip install databricks-cli
+
+      - name: Configure Databricks 
+        run: |
+          echo "[DEFAULT]" > ~/.databrickscfg
+          echo "host = ${{ secrets.DATABRICKS_HOST }}" >> ~/.databrickscfg
+          echo "token = ${{ secrets.DATABRICKS_TOKEN }}" >> ~/.databrickscfg
+
+      - name: Deploy Asset Bundle
+        run: |
+          databricks bundle deploy -t dev
+      
+      - name: Sync notebooks
+        run: |
+          databricks workspace import_dir \ 
+            ./notebooks \
+            /Workspace/Shared/chi311/notebooks \
+            --overwrite
+  
+  # ========================================================================
+  # Deploy to Prod (manual approval)
+  # ========================================================================
+  deploy-prod:
+    name: Deploy to Prod 
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    if: github.ref == 'ref/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install Databricks CLI 
+        run: pip install databricks-cli
+
+      - name: Configure databricks
+        run: |
+          echo "[DEFAULT]" > ~/.databrickscfg
+          echo "host = ${{ secrets.DATABRICKS_HOST }}" >> ~/.databrickscfg
+          echo "token = ${{ secrets.DATABRICKS_TOKEN }}" >> ~/.databrickscfg
+
+      - name: Deploy Asset Bundle (Prod)
+        run: |
+          databricks bundle deploy -t prod
