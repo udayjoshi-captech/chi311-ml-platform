@@ -97,25 +97,25 @@ resource "azurerm_storage_container" "bronze" {
 }
 
 resource "azurerm_storage_container" "silver" {
-    name =                = "silver"
+    name                  = "silver"
     storage_account_id    = azurerm_storage_account.data.id
     container_access_type = "private"  
 }
 
 resource "azurerm_storage_container" "gold" {
-    name =                = "gold"
+    name                  = "gold"
     storage_account_id    = azurerm_storage_account.data.id
     container_access_type = "private"  
 }
 
 resource "azurerm_storage_container" "landing" {
-    name =                = "landing"
+    name                  = "landing"
     storage_account_id    = azurerm_storage_account.data.id
     container_access_type = "private"  
 }
 
 resource "azurerm_storage_container" "checkpoints" {
-    name =                = "checkpoints"
+    name                 = "checkpoints"
     storage_account_id    = azurerm_storage_account.data.id
     container_access_type = "private"  
 }
