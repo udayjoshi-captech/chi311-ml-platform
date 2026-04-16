@@ -38,22 +38,7 @@ variable "databricks_sku" {
     default     = "premium"
 
     validation {
-        condition       = contains(["standard", "premium"], car.databricks_sku)
-        error_message   = "Databricks SKU must be standard or premium"
-    }
-}
-
-# ============================================================================
-# Databricks Configuration
-# ============================================================================
-
-variable "databricks_sku" {
-    description = "Databricks workspace SKU (standard or premium)"
-    type        = string
-    default     = "premium"
-
-    validation {
-        condition       = contains(["standard", "premium"], car.databricks_sku)
+        condition       = contains(["standard", "premium"], var.databricks_sku)
         error_message   = "Databricks SKU must be standard or premium"
     }
 }

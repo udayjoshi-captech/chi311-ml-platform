@@ -91,7 +91,7 @@ resource "azurerm_storage_account" "data" {
 
 # Medallion Architecture containers
 resource "azurerm_storage_container" "bronze" {
-    name =                = "bronze"
+    name                  = "bronze"
     storage_account_id    = azurerm_storage_account.data.id
     container_access_type = "private"  
 }
