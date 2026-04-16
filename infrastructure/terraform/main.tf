@@ -198,9 +198,8 @@ resource "azurerm_consumption_budget_resource_group" "this" {
     time_grain            = "Monthly"
 
     time_period {
-      
-      start_date = "2026-02-23"
-      end_date   = "2026-05-23" 
+      start_date = "2026-04-01"
+      end_date   = "2026-06-30" 
     }
 
     notification {
