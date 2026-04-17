@@ -92,31 +92,31 @@ resource "azurerm_storage_account" "data" {
 # Medallion Architecture containers
 resource "azurerm_storage_container" "bronze" {
     name                  = "bronze"
-    storage_account_id    = azurerm_storage_account.data.id
+    storage_account_name    = azurerm_storage_account.data.name
     container_access_type = "private"  
 }
 
 resource "azurerm_storage_container" "silver" {
     name                  = "silver"
-    storage_account_id    = azurerm_storage_account.data.id
+    storage_account_name    = azurerm_storage_account.data.name
     container_access_type = "private"  
 }
 
 resource "azurerm_storage_container" "gold" {
     name                  = "gold"
-    storage_account_id    = azurerm_storage_account.data.id
+    storage_account_name    = azurerm_storage_account.data.name
     container_access_type = "private"  
 }
 
 resource "azurerm_storage_container" "landing" {
     name                  = "landing"
-    storage_account_id    = azurerm_storage_account.data.id
+    storage_account_name    = azurerm_storage_account.data.name
     container_access_type = "private"  
 }
 
 resource "azurerm_storage_container" "checkpoints" {
     name                 = "checkpoints"
-    storage_account_id    = azurerm_storage_account.data.id
+    storage_account_name    = azurerm_storage_account.data.name
     container_access_type = "private"  
 }
 
@@ -163,7 +163,7 @@ resource "azurerm_log_analytics_workspace" "this" {
 }
 
 # Diagnostic settings for Databricks workspace
-resource "azurerm_monitior_diagnostic_setting" "databricks" {
+resource "azurerm_monitor_diagnostic_setting" "databricks" {
     name                        = "${local.prefix}-dbw-diag"
     target_resource_id          = azurerm_databricks_workspace.this.id
     log_analytics_workspace_id  = azurerm_log_analytics_workspace.this.id
