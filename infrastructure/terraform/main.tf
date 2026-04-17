@@ -179,7 +179,7 @@ resource "azurerm_monitor_diagnostic_setting" "databricks" {
     enabled_log {
         category = "jobs"
     }
-}
+} 
 
 # ============================================================================
 # Budget Alert (Azure Cost Management)
