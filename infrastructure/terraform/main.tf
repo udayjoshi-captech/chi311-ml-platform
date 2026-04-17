@@ -182,7 +182,6 @@ resource "azurerm_monitor_diagnostic_setting" "databricks" {
 
     enabled_log {
         category = "AllMetrics"
-        enabled = true
     }
 }
 
