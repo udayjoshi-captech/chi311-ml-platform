@@ -13,7 +13,7 @@ bundle:
 # ==========================================================================
 
 workspace:
-  host: ${var.databricks_host}
+  host: https://adb-7405612421287086.6.azuredatabricks.net
 
 # ==========================================================================
 # Variables
@@ -22,7 +22,7 @@ workspace:
 variables:
   databricks_host:
     description: "Azure Databricks Workspace URL"
-    default: "https://adb-XXXXX.azuredatabricks.net"
+    default: "https://adb-7405612421287086.6.azuredatabricks.net"
 
 # ==========================================================================
 # Targets (Environments)
@@ -35,22 +35,28 @@ targets:
   dev:
     mode: development
     default: true
-    workspace:
-      host: ${var.databricks_host}
     
     resources:
       jobs:
-        # Daily data ingestion (serverless - no cluster definition needed)
+        # Daily data ingestion
         daily_ingestion:
           name: "[DEV] Chi311 Daily Ingestion"
+          job_clusters:
+            - job_cluster_key: main
+              new_cluster:
+                spark_version: "15.4.x-scala2.12"
+                node_type_id: "Standard_DS3_v2"
+                num_workers: 1
           tasks:
             - task_key: api_to_volume
+              job_cluster_key: main
               notebook_task:
                 notebook_path: notebooks/02_ingestion/01_api_to_volume.py
             
             - task_key: bronze_autoloader
               depends_on:
                 - task_key: api_to_volume
+              job_cluster_key: main
               notebook_task:
                 notebook_path: notebooks/02_ingestion/02_bronze_autoloader.py
 
@@ -59,42 +65,60 @@ targets:
             timezone_id: "America/Chicago"
             pause_status: PAUSED # Paused in dev
         
-        # Data quality checks (serverless)
+        # Data quality checks
         data_quality:
           name: "[DEV] Chi311 Data Quality"
+          job_clusters:
+            - job_cluster_key: main
+              new_cluster:
+                spark_version: "15.4.x-scala2.12"
+                node_type_id: "Standard_DS3_v2"
+                num_workers: 1
           tasks:
             - task_key: run_dq_checks
+              job_cluster_key: main
               notebook_task:
                 notebook_path: notebooks/03_data_quality/01_data_quality_checks.py
         
-        # ML training pipeline (serverless)
+        # ML training pipeline
         ml_training:
           name: "[DEV] Chi311 ML Training"
+          job_clusters:
+            - job_cluster_key: main
+              new_cluster:
+                spark_version: "15.4.x-scala2.12"
+                node_type_id: "Standard_DS3_v2"
+                num_workers: 1
           tasks:
             - task_key: forecasting
+              job_cluster_key: main
               notebook_task:
                 notebook_path: notebooks/04_ml/01_forecasting.py
 
             - task_key: anomaly_detection
-              depends_on: forecasting
+              depends_on:
+                - task_key: forecasting
+              job_cluster_key: main
               notebook_task:
                 notebook_path: notebooks/04_ml/02_anomaly_detection.py
 
           schedule:
-            quartz_cron_expression: "0 0 8 * * 1" # Monday 8AM
+            quartz_cron_expression: "0 0 8 ? * MON" # Monday 8AM
             timezone_id: "America/Chicago"
             pause_status: PAUSED
 
-      # Lakeflow pipeline (serverless)
+      # Lakeflow pipeline
       pipelines:
         chi311_dlt_pipeline:
           name: "[DEV] Chi311 Lakeflow Pipeline"
           target: "silver"
-          catalog: "workspace"
           development: true
-          serverless: true
+          clusters:
+            - label: default
+              num_workers: 1
+              node_type_id: "Standard_DS3_v2"
           libraries:
-            - notebook:
+            - file:
                 path: pipelines/chi311_scd2_pipeline.sql
   
   # ========================================================================
@@ -102,8 +126,6 @@ targets:
   # ========================================================================
   prod:
     mode: production
-    workspace:
-      host: ${var.databricks_host}
 
     resources:
       jobs:
@@ -126,14 +148,16 @@ targets:
             timezone_id: "America/Chicago"
             pause_status: UNPAUSED
 
-      # Lakeflow pipeline (serverless)
+      # Lakeflow pipeline
       pipelines:
         chi311_dlt_pipeline:
           name: "[PROD] Chi311 Lakeflow Pipeline"
           target: "silver"
-          catalog: "workspace"
           development: false
-          serverless: true
+          clusters:
+            - label: default
+              num_workers: 2
+              node_type_id: "Standard_DS3_v2"
           libraries:
-            - notebook: 
+            - file:
                 path: pipelines/chi311_scd2_pipeline.sql
