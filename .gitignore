@@ -150,10 +150,10 @@ venv.bak/
 
 # Terraform
 .terraform/
-.*tfstate
+*.tfstate
 *.tfstate.backup
-*.tfvars
 .terraform.lock.hcl
+.tf-plugin-cache/
 
 # Databricks
 .databricks/
