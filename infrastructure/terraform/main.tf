@@ -70,8 +70,8 @@ resource "azurerm_resource_group" "this" {
 
 resource "azurerm_storage_account" "data" {
     name                        = replace("${local.prefix}data", "-", "")
-    resource_group_name         = azure_resource_group.this.name 
-    location                    = azure_resource_group.this.location
+    resource_group_name         = azurerm_resource_group.this.name 
+    location                    = azurerm_resource_group.this.location
     account_tier                = "Standard"
     account_replication_type    = "LRS"
     account_kind                = "StorageV2"
