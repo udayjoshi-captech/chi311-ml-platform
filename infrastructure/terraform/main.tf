@@ -58,10 +58,8 @@ locals {
 # Resource Group
 # ============================================================================ 
 
-resource "azurerm_resource_group" "this" {
-    name     = "${local.prefix}-rg"
-    location = var.azure_region
-    tags     = local.common_tags
+data "azurerm_resource_group" "this" {
+    name     = "DnA-Playground"
 }
 
 # ============================================================================
@@ -70,8 +68,8 @@ resource "azurerm_resource_group" "this" {
 
 resource "azurerm_storage_account" "data" {
     name                        = replace("${local.prefix}data", "-", "")
-    resource_group_name         = azurerm_resource_group.this.name 
-    location                    = azurerm_resource_group.this.location
+    resource_group_name         = data.azurerm_resource_group.this.name 
+    location                    = data.azurerm_resource_group.this.location
     account_tier                = "Standard"
     account_replication_type    = "LRS"
     account_kind                = "StorageV2"
@@ -126,8 +124,8 @@ resource "azurerm_storage_container" "checkpoints" {
 
 resource "azurerm_databricks_workspace" "this" {
     name                                     = "${local.prefix}-dbw"
-    resource_group_name                      = azurerm_resource_group.this.name
-    location                                 = azurerm_resource_group.this.location
+    resource_group_name                      = data.azurerm_resource_group.this.name
+    location                                 = data.azurerm_resource_group.this.location
     sku                                      = var.databricks_sku
     managed_resource_group_name = "${local.prefix}-dbw-managed-rg"
 
@@ -156,8 +154,8 @@ resource "databricks_secret" "socrata_app_token" {
 
 resource "azurerm_log_analytics_workspace" "this" {
     name                = "${local.prefix}-logs"
-    location            = azurerm_resource_group.this.location
-    resource_group_name = azurerm_resource_group.this.name
+    location            = data.azurerm_resource_group.this.location
+    resource_group_name = data.azurerm_resource_group.this.name
     sku                 = "PerGB2018"
     retention_in_days   = 30
 
