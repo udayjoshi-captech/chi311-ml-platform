@@ -191,7 +191,7 @@ resource "azurerm_monitor_diagnostic_setting" "databricks" {
 
 resource "azurerm_consumption_budget_resource_group" "this" {
     name                  = "${local.prefix}-budget"
-    resource_group_id     = azurerm_resource_group.this.id
+    resource_group_id     = data.azurerm_resource_group.this.id
 
     amount                = var.monthly_budget
     time_grain            = "Monthly"
