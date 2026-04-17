@@ -179,10 +179,6 @@ resource "azurerm_monitor_diagnostic_setting" "databricks" {
     enabled_log {
         category = "jobs"
     }
-
-    enabled_log {
-        category = "AllMetrics"
-    }
 }
 
 # ============================================================================
