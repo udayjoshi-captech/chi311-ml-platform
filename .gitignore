@@ -152,6 +152,7 @@ venv.bak/
 .terraform/
 .*tfstate
 *.tfstate.backup
+*.tfvars
 .terraform.lock.hcl
 
 # Databricks
