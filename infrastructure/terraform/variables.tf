@@ -83,6 +83,22 @@ variable "monthly_budget" {
 }
 
 # ============================================================================
+# Databricks Provider Bootstrap
+# ============================================================================
+
+variable "databricks_workspace_url" {
+    description = "Databricks workspace URL (required to bootstrap the provider when workspace already exists)"
+    type        = string
+    default     = ""
+}
+
+variable "databricks_workspace_resource_id" {
+    description = "Databricks workspace Azure resource ID (required to bootstrap the provider when workspace already exists)"
+    type        = string
+    default     = ""
+}
+
+# ============================================================================
 # Tags
 # ============================================================================
 

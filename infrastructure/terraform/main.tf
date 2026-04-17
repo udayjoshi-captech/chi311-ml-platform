@@ -29,8 +29,8 @@ provider "azurerm" {
 }
 
 provider "databricks" {
-    host                            = azurerm_databricks_workspace.this.workspace_url
-    azure_workspace_resource_id     = azurerm_databricks_workspace.this.id
+    host                        = var.databricks_workspace_url
+    azure_workspace_resource_id = var.databricks_workspace_resource_id
 }
 
 # ============================================================================
@@ -85,6 +85,10 @@ resource "azurerm_storage_account" "data" {
     }  
     
     tags     = local.common_tags
+
+    lifecycle {
+        ignore_changes = [tags["CreatedOnDate"]]
+    }
 }
 
 # Medallion Architecture containers
@@ -129,7 +133,11 @@ resource "azurerm_databricks_workspace" "this" {
     sku                                      = var.databricks_sku
     managed_resource_group_name = "${local.prefix}-dbw-managed-rg"
 
-    tags = local.common_tags  
+    tags = local.common_tags
+
+    lifecycle {
+        ignore_changes = [tags["CreatedOnDate"]]
+    }
 }
 
 # ============================================================================
@@ -159,7 +167,11 @@ resource "azurerm_log_analytics_workspace" "this" {
     sku                 = "PerGB2018"
     retention_in_days   = 30
 
-    tags = local.common_tags 
+    tags = local.common_tags
+
+    lifecycle {
+        ignore_changes = [tags["CreatedOnDate"]]
+    }
 }
 
 # Diagnostic settings for Databricks workspace
