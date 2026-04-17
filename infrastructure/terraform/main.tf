@@ -139,13 +139,15 @@ resource "azurerm_databricks_workspace" "this" {
 # ============================================================================ 
 
 resource "databricks_secret_scope" "chi311" {
+    count = var.socrata_app_token != "" ? 1 : 0
     name = "chi311-${var.environment}"
 }
 
 resource "databricks_secret" "socrata_app_token" {
+    count           = var.socrata_app_token != "" ? 1 : 0 
     key             = "socrata-app-token"
     string_value    = var.socrata_app_token
-    scope           = databricks_secret_scope.chi311.name 
+    scope           = databricks_secret_scope.chi311[0].name 
 }
 
 # ============================================================================
