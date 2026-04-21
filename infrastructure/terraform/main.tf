@@ -227,3 +227,56 @@ resource "azurerm_consumption_budget_resource_group" "this" {
     }
 }
 
+# ============================================================================
+# Azure Monitor - Alert: Databricks Job Failures
+# ============================================================================
+
+resource "azurerm_monitor_action_group" "email" {
+    name                = "${local.prefix}-alert-ag"
+    resource_group_name = data.azurerm_resource_group.this.name
+    short_name          = "chi311-ag"
+
+    email_receiver {
+        name          = "owner"
+        email_address = var.alert_email
+    }
+}
+
+resource "azurerm_monitor_scheduled_query_rules_alert_v2" "job_failures" {
+    name                = "${local.prefix}-dbw-job-failures"
+    resource_group_name = data.azurerm_resource_group.this.name
+    location            = data.azurerm_resource_group.this.location
+
+    description = "Alert when any Databricks job run fails"
+    severity    = 2
+    enabled     = true
+
+    scopes                  = [azurerm_log_analytics_workspace.this.id]
+    evaluation_frequency    = "PT15M"
+    window_duration         = "PT15M"
+
+    criteria {
+        query = <<-QUERY
+            DatabricksJobs
+            | where TimeGenerated > ago(15m)
+            | where ActionName == "runFailed"
+            | summarize FailedRuns = count() by bin(TimeGenerated, 15m)
+        QUERY
+
+        time_aggregation_method = "Count"
+        threshold               = 0
+        operator                = "GreaterThan"
+
+        failing_periods {
+            minimum_failing_periods_to_trigger_alert = 1
+            number_of_evaluation_periods             = 1
+        }
+    }
+
+    action {
+        action_groups = [azurerm_monitor_action_group.email.id]
+    }
+
+    tags = local.common_tags
+}
+

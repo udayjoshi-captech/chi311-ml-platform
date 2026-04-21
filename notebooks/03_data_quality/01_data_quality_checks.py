@@ -22,8 +22,17 @@ from pyspark.sql import functions as F
 from datetime import datetime
 
 # Configuration
-CATALOG = "workspace"
+CATALOG = dbutils.widgets.get("catalog") if "dbutils" in dir() else "workspace"  # noqa: F821
+STORAGE_ACCOUNT = dbutils.widgets.get("storage_account") if "dbutils" in dir() else ""  # noqa: F821
 BRONZE_TABLE = f"{CATALOG}.bronze.bronze_raw_311_requests"
+DQ_RESULTS_TABLE = f"{CATALOG}.gold.dq_checkpoint_results"
+
+# GE data docs will be written here so results survive across runs
+GE_DOCS_ROOT = (
+    f"abfss://checkpoints@{STORAGE_ACCOUNT}.dfs.core.windows.net/great_expectations"
+    if STORAGE_ACCOUNT
+    else "/tmp/great_expectations"
+)
 
 # COMMAND -----------
 
@@ -33,6 +42,29 @@ BRONZE_TABLE = f"{CATALOG}.bronze.bronze_raw_311_requests"
 # COMMAND -----------
 
 context = gx.get_context()
+
+# Configure ADLS-backed data docs store so HTML results persist across runs
+context.add_store(
+    store_name="adls_validations_store",
+    store_config={
+        "class_name": "ValidationsStore",
+        "store_backend": {
+            "class_name": "TupleFilesystemStoreBackend",
+            "base_directory": f"{GE_DOCS_ROOT}/validations",
+        },
+    },
+)
+context.add_data_docs_site(
+    site_name="adls_site",
+    site_config={
+        "class_name": "SiteBuilder",
+        "store_backend": {
+            "class_name": "TupleFilesystemStoreBackend",
+            "base_directory": f"{GE_DOCS_ROOT}/data_docs",
+        },
+        "site_index_builder": {"class_name": "DefaultSiteIndexBuilder"},
+    },
+)
 
 # Connect to Bronze table
 df_bronze = spark.read.table(BRONZE_TABLE)
@@ -165,6 +197,40 @@ if silver_exists:
     print("=" * 60)
     print(f"Success: {silver_results.success}")
     print(f"Pass Rate: {silver_results.statistics['success_percent']:.1f}%")
+
+# COMMAND -----------
+
+# MAGIC %md
+# MAGIC ## Persist Checkpoint Results to Delta
+
+# COMMAND -----------
+
+def _build_results_row(layer: str, results) -> dict:
+    """Extract summary stats from a GE ValidationResult."""
+    stats = results.statistics
+    return {
+        "run_date": datetime.now().date().isoformat(),
+        "layer": layer,
+        "success": bool(results.success),
+        "expectations_evaluated": int(stats["evaluated_expectations"]),
+        "expectations_passed": int(stats["successful_expectations"]),
+        "expectations_failed": int(stats["unsuccessful_expectations"]),
+        "pass_rate_pct": round(float(stats.get("success_percent", 0.0)), 2),
+        "logged_at": datetime.now().isoformat(),
+    }
+
+
+rows = [_build_results_row("bronze", bronze_results)]
+if silver_exists:
+    rows.append(_build_results_row("silver", silver_results))
+
+df_results = spark.createDataFrame(rows)  # noqa: F821
+df_results.write.format("delta").mode("append").saveAsTable(DQ_RESULTS_TABLE)
+print(f"DQ results written to {DQ_RESULTS_TABLE}")
+
+# Build / update HTML data docs on ADLS
+context.build_data_docs(site_names=["adls_site"])
+print(f"Data docs updated at: {GE_DOCS_ROOT}/data_docs")
 
 # COMMAND -----------
 
