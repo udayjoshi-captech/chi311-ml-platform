@@ -37,6 +37,7 @@ def add_rolling_features(df: pd.DataFrame, windows: list = None) -> pd.DataFrame
     for w in windows:
         df[f"rolling_mean_{w}d"] = df["y"].rolling(w, min_periods=1).mean()
         df[f"rolling_std_{w}d"] = df["y"].rolling(w, min_periods=1).std()
+    return df
 
 
 def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
