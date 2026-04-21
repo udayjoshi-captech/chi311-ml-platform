@@ -14,14 +14,14 @@ from chi311.features.feature_engineering import (
 @pytest.fixture
 def sample_daily_data():
     """Create sample daily data for testing."""
-    dates = pd.date_range("2024-01-01", period=60, freq="D")
+    dates = pd.date_range("2024-01-01", periods=60, freq="D")
     np.random.seed(42)
-    values = np.random.normal(3000, 500, 60).clip(1500, 500)
+    values = np.random.normal(3000, 500, 60).clip(1500, 5000)
     return pd.DataFrame({"ds": dates, "y": values})
 
 
 class TestTemporalFeatures:
-    def test_adds_day_of_week(self, sample_daiy_data):
+    def test_adds_day_of_week(self, sample_daily_data):
         result = add_temporal_features(sample_daily_data)
         assert "day_of_week" in result.columns
         assert result["day_of_week"].between(0, 6).all()
