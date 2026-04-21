@@ -12,9 +12,9 @@
 -- Storage: ADLS Gen 2 / Unity Catalog Volumes
 --
 -- Unity Catalog Structure:
---  workspace.bronze.bronze_raw_311_requests (source from Autoloader)
---  workspace.silver.silver_*                (this pipeline)
---  workspace.gold.gold_*                    (this pipeline)
+--  chi311.bronze.bronze_raw_311_requests (source from Autoloader)
+--  chi311.silver.silver_*                (this pipeline)
+--  chi311.gold.gold_*                    (this pipeline)
 --
 -- Chicago 311 API: https://data.cityofchicago.org/resource/v6vf-nfxy.json
 --
@@ -30,7 +30,7 @@
 --  1. Go to Workflows -> Lakeflow Declarative Pipelines
 --  2. Create new pipeline
 --  3. Point to this file
---  4. Set Target catalog: workspace, Target schema: silver
+--  4. Set Target catalog: chi311, Target schema: silver
 --  5. Run in Development mode first
 -- =============================================================================
 
@@ -85,7 +85,7 @@ SELECT
     -- Audit
     current_timestamp() AS _processed_timestamp
 
-FROM STREAM(workspace.bronze.bronze_raw_311_requests)
+FROM STREAM(chi311.bronze.bronze_raw_311_requests)
 
 WHERE
     sr_number IS NOT NULL AND TRIM(sr_number) != ''

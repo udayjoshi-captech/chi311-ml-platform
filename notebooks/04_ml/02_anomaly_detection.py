@@ -21,7 +21,7 @@ from pyspark.sql import functions as F
 from datetime import datetime, timedelta
 
 # Configuration
-CATALOG = "workspace"
+CATALOG = "chi311"
 GOLD_TABLE = f"{CATALOG}.gold.gold_citywide_daily_summary"
 MODEL_NAME = "chi311_demand_forecast"
 

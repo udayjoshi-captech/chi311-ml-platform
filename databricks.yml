@@ -13,7 +13,7 @@ bundle:
 # ==========================================================================
 
 workspace:
-  host: https://adb-7405612421287086.6.azuredatabricks.net
+  host: https://adb-4187832108147597.17.azuredatabricks.net
 
 # ==========================================================================
 # Variables
@@ -22,7 +22,7 @@ workspace:
 variables:
   databricks_host:
     description: "Azure Databricks Workspace URL"
-    default: "https://adb-7405612421287086.6.azuredatabricks.net"
+    default: "https://adb-4187832108147597.17.azuredatabricks.net"
 
 # ==========================================================================
 # Targets (Environments)
@@ -135,7 +135,8 @@ targets:
       pipelines:
         chi311_dlt_pipeline:
           name: "[DEV] Chi311 Lakeflow Pipeline"
-          target: "chi311_silver"
+          catalog: chi311
+          target: silver
           development: true
           clusters:
             - label: default
@@ -179,7 +180,8 @@ targets:
       pipelines:
         chi311_dlt_pipeline:
           name: "[PROD] Chi311 Lakeflow Pipeline"
-          target: "chi311_silver"
+          catalog: chi311
+          target: silver
           development: false
           clusters:
             - label: default

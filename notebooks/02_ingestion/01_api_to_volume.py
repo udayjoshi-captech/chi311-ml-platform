@@ -27,7 +27,7 @@ API_URL = "https://data.cityofchicago.org/resource/v6vf-nfxy.json"
 API_LIMIT = 50000 # Max records per request
 
 # Volume paths
-CATALOG = "workspace"
+CATALOG = "chi311"
 LANDING_PATH = f"/Volumes/{CATALOG}/raw/chi311_landing"
 INITIAL_PATH = f"{LANDING_PATH}/initial"
 INCREMENTAL_PATH = f"{LANDING_PATH}/incremental"

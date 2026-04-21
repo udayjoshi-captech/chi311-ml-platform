@@ -22,7 +22,7 @@ from pyspark.sql import functions as F
 from datetime import datetime
 
 # Configuration
-CATALOG = dbutils.widgets.get("catalog") if "dbutils" in dir() else "workspace"  # noqa: F821
+CATALOG = dbutils.widgets.get("catalog") if "dbutils" in dir() else "chi311"  # noqa: F821
 STORAGE_ACCOUNT = dbutils.widgets.get("storage_account") if "dbutils" in dir() else ""  # noqa: F821
 BRONZE_TABLE = f"{CATALOG}.bronze.bronze_raw_311_requests"
 DQ_RESULTS_TABLE = f"{CATALOG}.gold.dq_checkpoint_results"

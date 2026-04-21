@@ -25,7 +25,7 @@ from datetime import datetime
 from pyspark.sql import functions as F
 
 # Configuration
-CATALOG = "workspace"
+CATALOG = "chi311"
 GOLD_TABLE = f"{CATALOG}.gold.gold_citywide_daily_summary"
 EXPERIMENT_NAME = "/Shared/chi311-forecasting"
 MODEL_NAME = "chi311_demand_forecast"

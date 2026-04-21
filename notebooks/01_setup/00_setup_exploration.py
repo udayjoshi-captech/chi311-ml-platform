@@ -18,7 +18,7 @@
 # COMMAND -----------
 
 # Configuration
-CATALOG_NAME = "workspace"
+CATALOG_NAME = "chi311"
 
 SCHEMAS = {
     "raw": "landing zone for raw API data",
@@ -36,6 +36,12 @@ VOLUMES = {
         "chi311_checkpoint": "Autoloader checkpoint directory"
     }
 }
+
+# COMMAND -----------
+
+# Create catalog (Unity Catalog)
+spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG_NAME} COMMENT 'Chicago 311 Intelligence Platform'")
+print(f"Catalog: {CATALOG_NAME}")
 
 # COMMAND -----------
 
