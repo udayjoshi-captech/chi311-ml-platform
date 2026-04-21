@@ -2,7 +2,9 @@
 Integration tests for the full pipeline.
 These require a running Databricks workspace
 """
-import pytest 
+
+import pytest
+
 
 @pytest.mark.integration
 class TestPipelineE2E:
@@ -17,7 +19,7 @@ class TestPipelineE2E:
     def test_sliver_scd2_populated(self):
         """Verify Silver SCD2 table has history records."""
         pass
-    
+
     @pytest.mark.skip(reason="Requires live Databricks workspace")
     def test_gold_daily_summary_populated(self):
         """Verify Gold daily summary has data after pipeline run."""

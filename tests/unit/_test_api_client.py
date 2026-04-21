@@ -1,20 +1,18 @@
 """Unit tests for Chi311 API Client."""
-import pytest
+
 from unittest.mock import patch, MagicMock
 from chi311.ingestion.api_client import Chi311APIClient, APIConfig
+
 
 class TestChi311APIClient:
     """Tests for Chicago 311 API client."""
 
     def setup_method(self):
         self.config = APIConfig(
-            page_size=100,
-            max_retries=2,
-            retry_delay=0.1,
-            timeout=5
+            page_size=100, max_retries=2, retry_delay=0.1, timeout=5
         )
         self.client = Chi311APIClient(self.config)
-    
+
     @patch("chi311.ingestion.api_client.requests.Session.get")
     def test_fetch_records_success(self, mock_get):
         """Test successful record fetch"""
@@ -30,7 +28,7 @@ class TestChi311APIClient:
         records = self.client.fetch_records("2024-01-01", "2024-01-02")
         assert len(records) == 2
         assert records[0]["sr_number"] == "SR001"
-    
+
     @patch("chi311.ingestion.api_client.requests.Session.get")
     def test_fetch_records_empty(self, mock_get):
         """Test empty response."""
@@ -42,7 +40,7 @@ class TestChi311APIClient:
 
         records = self.client.fetch_records("2024-01-01", "2024-01-02")
         assert len(records) == 0
-    
+
     @patch("chi311.ingestion.api_client.requests.Session.get")
     def test_fetch_all_pagination(self, mock_get):
         """Test pagination across multiple pages."""
@@ -61,7 +59,7 @@ class TestChi311APIClient:
 
         records = self.client.fetch_all("2024-01-01", "2024-01-02")
         assert len(records) == 150
-    
+
     @patch("chi311.ingestion.api_client.requests.Session.get")
     def test_health_check_success(self, mock_get):
         """Test successful health check."""
@@ -70,7 +68,7 @@ class TestChi311APIClient:
         mock_get.return_value = mock_response
 
         assert self.client.health_check() is True
-    
+
     @patch("chi311.ingestion.api_client.requests.Session.get")
     def test_health_check_failure(self, mock_get):
         """Test failed health check."""
@@ -88,4 +86,4 @@ class TestChi311APIClient:
         config = APIConfig()
         assert config.page_size == 50000
         assert config.max_retries == 3
-        assert config.timeout == 60   
+        assert config.timeout == 60

@@ -2,8 +2,9 @@
 Feature engineering for Prophet forecasting.
 Generates temporal, lag and rolling features from Gold daily summaries.
 """
+
 import pandas as pd
-import numpy as np
+
 
 def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
     """Add temporal features to daily summary DataFrame."""
@@ -17,6 +18,7 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
     df["is_month_end"] = df["ds"].dt.is_month_end.astype(int)
     return df
 
+
 def add_lag_features(df: pd.DataFrame, lags: list = None) -> pd.DataFrame:
     """Add lag features for time series"""
     if lags is None:
@@ -26,6 +28,7 @@ def add_lag_features(df: pd.DataFrame, lags: list = None) -> pd.DataFrame:
         df[f"lag_{lag}"] = df["y"].shift(lag)
     return df
 
+
 def add_rolling_features(df: pd.DataFrame, windows: list = None) -> pd.DataFrame:
     """Add rolling mean and std features"""
     if windows is None:
@@ -34,6 +37,7 @@ def add_rolling_features(df: pd.DataFrame, windows: list = None) -> pd.DataFrame
     for w in windows:
         df[f"rolling_mean_{w}d"] = df["y"].rolling(w, min_periods=1).mean()
         df[f"rolling_std_{w}d"] = df["y"].rolling(w, min_periods=1).std()
+
 
 def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
     "Full feature engineering pipeline"

@@ -1,5 +1,6 @@
 """Unit tests for feature engineering."""
-import pytest 
+
+import pytest
 import pandas as pd
 import numpy as np
 from chi311.features.feature_engineering import (
@@ -8,6 +9,7 @@ from chi311.features.feature_engineering import (
     add_rolling_features,
     prepare_features,
 )
+
 
 @pytest.fixture
 def sample_daily_data():
@@ -23,7 +25,7 @@ class TestTemporalFeatures:
         result = add_temporal_features(sample_daily_data)
         assert "day_of_week" in result.columns
         assert result["day_of_week"].between(0, 6).all()
-    
+
     def test_adds_is_weekend(self, sample_daily_data):
         result = add_temporal_features(sample_daily_data)
         assert "is_weekend" in result.columns
@@ -46,7 +48,6 @@ class TestLagFeatures:
         assert "lag_3" in result.columns
         assert "lag_5" in result.columns
         assert "lag_1" not in result.columns
-
 
 
 class TestRollingFeatures:
