@@ -46,7 +46,15 @@ targets:
               new_cluster:
                 spark_version: "15.4.x-scala2.12"
                 node_type_id: "Standard_DS3_v2"
-                num_workers: 1
+                num_workers: 0
+                spark_conf:
+                  spark.databricks.cluster.profile: singleNode
+                  spark.master: "local[*]"
+                custom_tags:
+                  ResourceClass: SingleNode
+                azure_attributes:
+                  availability: SPOT_WITH_FALLBACK_AZURE
+                  spot_bid_max_price: -1
           tasks:
             - task_key: api_to_volume
               job_cluster_key: main
@@ -73,7 +81,15 @@ targets:
               new_cluster:
                 spark_version: "15.4.x-scala2.12"
                 node_type_id: "Standard_DS3_v2"
-                num_workers: 1
+                num_workers: 0
+                spark_conf:
+                  spark.databricks.cluster.profile: singleNode
+                  spark.master: "local[*]"
+                custom_tags:
+                  ResourceClass: SingleNode
+                azure_attributes:
+                  availability: SPOT_WITH_FALLBACK_AZURE
+                  spot_bid_max_price: -1
           tasks:
             - task_key: run_dq_checks
               job_cluster_key: main
@@ -88,7 +104,15 @@ targets:
               new_cluster:
                 spark_version: "15.4.x-scala2.12"
                 node_type_id: "Standard_DS3_v2"
-                num_workers: 1
+                num_workers: 0
+                spark_conf:
+                  spark.databricks.cluster.profile: singleNode
+                  spark.master: "local[*]"
+                custom_tags:
+                  ResourceClass: SingleNode
+                azure_attributes:
+                  availability: SPOT_WITH_FALLBACK_AZURE
+                  spot_bid_max_price: -1
           tasks:
             - task_key: forecasting
               job_cluster_key: main
@@ -111,12 +135,15 @@ targets:
       pipelines:
         chi311_dlt_pipeline:
           name: "[DEV] Chi311 Lakeflow Pipeline"
-          target: "silver"
+          target: "chi311_silver"
           development: true
           clusters:
             - label: default
               num_workers: 1
               node_type_id: "Standard_DS3_v2"
+              azure_attributes:
+                availability: SPOT_WITH_FALLBACK_AZURE
+                spot_bid_max_price: -1
           libraries:
             - file:
                 path: pipelines/chi311_scd2_pipeline.sql
@@ -152,7 +179,7 @@ targets:
       pipelines:
         chi311_dlt_pipeline:
           name: "[PROD] Chi311 Lakeflow Pipeline"
-          target: "silver"
+          target: "chi311_silver"
           development: false
           clusters:
             - label: default

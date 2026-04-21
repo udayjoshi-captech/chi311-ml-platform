@@ -79,7 +79,7 @@ variable "alert_email" {
 variable "monthly_budget" {
     description = "Monthly budget in USD for the resource group"
     type        = number
-    default     = 25
+    default     = 100
 }
 
 # ============================================================================
