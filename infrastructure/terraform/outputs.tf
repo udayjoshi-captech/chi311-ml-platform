@@ -18,13 +18,13 @@ output "storage_account_primary_dfs_endpoint" {
 }
 
 output "databricks_workspace_url" {
-    description = "URL of the Azure Databricks workspace"
-    value       = "https://${azurerm_databricks_workspace.this.workspace_url}"
+    description = "URL of the Databricks sandbox workspace"
+    value       = var.databricks_workspace_url
 }
 
 output "databricks_workspace_id" {
-    description = "Azure resource ID of the Databricks workspace"
-    value       = azurerm_databricks_workspace.this.id
+    description = "Azure resource ID of the Databricks sandbox workspace"
+    value       = var.databricks_workspace_resource_id
 }
 
 output "log_analytics_workspace_id" {

@@ -1,7 +1,9 @@
 # ============================================================================
 # Chicago 311 Intelligence Platform - Azure Infrastructure
 # ============================================================================
-# Provisions: Resource Group, ADLS Gen2, Databricks Workspace, Monitor
+# Provisions: ADLS Gen2, Log Analytics, Budget, Monitor Alert
+# NOTE: Databricks workspace (databrickssandbox202307) is pre-existing.
+#       Only supporting infrastructure is managed here.
 # ============================================================================
 
 terraform {
@@ -29,8 +31,8 @@ provider "azurerm" {
 }
 
 provider "databricks" {
-    host                        = var.databricks_workspace_url
-    azure_workspace_resource_id = var.databricks_workspace_resource_id
+    host  = var.databricks_workspace_url
+    token = var.databricks_token
 }
 
 # ============================================================================
@@ -123,37 +125,20 @@ resource "azurerm_storage_container" "checkpoints" {
 }
 
 # ============================================================================
-# Azure Databricks Workspace
-# ============================================================================ 
-
-resource "azurerm_databricks_workspace" "this" {
-    name                                     = "${local.prefix}-dbw"
-    resource_group_name                      = data.azurerm_resource_group.this.name
-    location                                 = data.azurerm_resource_group.this.location
-    sku                                      = var.databricks_sku
-    managed_resource_group_name = "${local.prefix}-dbw-managed-rg"
-
-    tags = local.common_tags
-
-    lifecycle {
-        ignore_changes = [tags["CreatedOnDate"]]
-    }
-}
-
+# Databricks Secret Scope (for API tokens, etc.)
+# Uses the pre-existing databrickssandbox202307 workspace via PAT auth
 # ============================================================================
-# Databricks Secret Scope (for APIs tokens, etc.)
-# ============================================================================ 
 
 resource "databricks_secret_scope" "chi311" {
     count = var.socrata_app_token != "" ? 1 : 0
-    name = "chi311-${var.environment}"
+    name  = "chi311-${var.environment}"
 }
 
 resource "databricks_secret" "socrata_app_token" {
-    count           = var.socrata_app_token != "" ? 1 : 0 
-    key             = "socrata-app-token"
-    string_value    = var.socrata_app_token
-    scope           = databricks_secret_scope.chi311[0].name 
+    count        = var.socrata_app_token != "" ? 1 : 0
+    key          = "socrata-app-token"
+    string_value = var.socrata_app_token
+    scope        = databricks_secret_scope.chi311[0].name
 }
 
 # ============================================================================
@@ -174,10 +159,12 @@ resource "azurerm_log_analytics_workspace" "this" {
     }
 }
 
-# Diagnostic settings for Databricks workspace
+# Diagnostic settings — targets the pre-existing sandbox workspace.
+# Only created when databricks_workspace_resource_id is provided in tfvars.
 resource "azurerm_monitor_diagnostic_setting" "databricks" {
+    count                       = var.databricks_workspace_resource_id != "" ? 1 : 0
     name                        = "${local.prefix}-dbw-diag"
-    target_resource_id          = azurerm_databricks_workspace.this.id
+    target_resource_id          = var.databricks_workspace_resource_id
     log_analytics_workspace_id  = azurerm_log_analytics_workspace.this.id
 
     enabled_log {

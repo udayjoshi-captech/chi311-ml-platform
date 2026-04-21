@@ -98,6 +98,13 @@ variable "databricks_workspace_resource_id" {
     default     = ""
 }
 
+variable "databricks_token" {
+    description = "Databricks PAT for the sandbox workspace (used by Terraform provider)"
+    type        = string
+    sensitive   = true
+    default     = ""
+}
+
 # ============================================================================
 # Tags
 # ============================================================================
