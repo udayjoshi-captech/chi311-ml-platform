@@ -1,24 +1,30 @@
 # 🏙️ Chicago 311 Service Request Intelligence Platform
 
-> **A Production-Grade ML Portfolio Project** demonstrating end-to-end machine learning engineering on **Azure Databricks** with Lakeflow Declarative Pipelines, SCD Type 2, and MLflow.
+> **A Production-Grade ML Portfolio Project** demonstrating end-to-end machine learning engineering on **Azure Databricks** with Lakeflow Declarative Pipelines, SCD Type 2, MLflow, and a full CI/CD pipeline.
 
+[![CI/CD Pipeline](https://github.com/udayjoshi-captech/chi311-ml-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/udayjoshi-captech/chi311-ml-platform/actions/workflows/ci.yml)
 [![Azure](https://img.shields.io/badge/Azure-Cloud-0078D4?logo=microsoftazure)](https://azure.microsoft.com)
 [![Databricks](https://img.shields.io/badge/Databricks-Sandbox-FF3621?logo=databricks)](https://databricks.com)
 [![MLflow](https://img.shields.io/badge/MLflow-Experiment%20Tracking-0194E2?logo=mlflow)](https://mlflow.org)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org)
+[![Terraform](https://img.shields.io/badge/Terraform-IaC-7B42BC?logo=terraform)](https://terraform.io)
 
 ---
 
 ## 📋 Table of Contents
 
 1. [Project Overview](#-project-overview)
-2. [ML Portfolio Framework Alignment](#-ml-portfolio-framework-alignment)
-3. [Architecture](#-architecture)
-4. [Quick Start](#-quick-start)
-5. [Component Deep Dives](#-component-deep-dives)
-6. [Project Structure](#-project-structure)
-7. [Success Metrics](#-success-metrics)
-8. [Cost Analysis](#-cost-analysis)
+2. [Architecture](#-architecture)
+3. [Technology Stack](#-technology-stack)
+4. [Project Structure](#-project-structure)
+5. [Quick Start](#-quick-start)
+6. [CI/CD Pipeline](#-cicd-pipeline)
+7. [Databricks Asset Bundle](#-databricks-asset-bundle)
+8. [Monitoring & Observability](#-monitoring--observability)
+9. [Data Engineering Practices](#-data-engineering-practices)
+10. [Cost Management](#-cost-management)
+11. [Key Findings](#-key-findings)
+12. [ML Portfolio Framework Alignment](#-ml-portfolio-framework-alignment)
 
 ---
 
@@ -26,91 +32,137 @@
 
 ### Problem Statement
 
-Chicago's 311 service handles thousands of non-emergency requests daily. Operations teams lack proactive tools to detect demand spikes before they overwhelm resources, resulting in degraded response times and inefficient staffing.
+Chicago's 311 service handles ~3,000 non-emergency service requests daily. Operations teams lack proactive tools to detect demand spikes before they overwhelm resources, resulting in degraded response times and inefficient staffing.
 
 ### Solution
 
 An end-to-end ML platform that:
-- **Forecasts** 7-day service request volumes for staffing optimization
-- **Detects anomalies** 2+ hours before spikes overwhelm resources
+- **Forecasts** 7-day service request volumes for staffing optimisation
+- **Detects anomalies** using statistical thresholds (mean + 2σ)
 - **Tracks request lifecycles** via SCD Type 2 for time-in-status analytics
 - **Validates data quality** at every pipeline stage with Great Expectations
+- **Monitors pipeline health** with per-task row counts, duration, and drift detection
 
 ### Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     DATA INGESTION                              │
-│  Chicago 311 API → API Client → Azure Databricks Volume         │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  DATA QUALITY (Great Expectations)              │
-│  Bronze Expectations → Silver Expectations → Gold Expectations  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│               LAKEFLOW PIPELINE (Medallion + SCD2)              │
-│  Bronze (Raw) → Silver (SCD2 History) → Gold (Aggregates)       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    ML PIPELINE (MLflow)                         │
-│  Feature Engineering → Prophet Training → Anomaly Detection     │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   SERVING & MONITORING                          │
-│  Streamlit Dashboard ← Batch Predictions ← Prediction Logging   │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                        DATA INGESTION                            │
+│  Chicago 311 API (Socrata) → Chi311APIClient → ADLS Gen2 Volume  │
+└──────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────┐
+│               DATA QUALITY (Great Expectations)                  │
+│  Bronze expectations → Silver expectations                       │
+│  Results persisted to gold.dq_checkpoint_results + ADLS docs     │
+└──────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────┐
+│          LAKEFLOW PIPELINE (Medallion + SCD Type 2)              │
+│  Bronze (Autoloader) → Silver (SCD2 history) → Gold (aggregates) │
+│  DLT CONSTRAINT expectations on every table                      │
+└──────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                     ML PIPELINE (MLflow)                         │
+│  Feature Engineering → Prophet Training → Anomaly Detection      │
+│  Experiments tracked in MLflow, metrics logged per run           │
+└──────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                  SERVING & MONITORING                            │
+│  Streamlit Dashboard ← Batch Predictions ← PredictionLogger      │
+│  PipelineMetrics → gold.pipeline_run_log (observability table)   │
+│  Azure Monitor alert → email on Databricks job failure           │
+└──────────────────────────────────────────────────────────────────┘
 ```
-
-### Key Technical Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| **Cloud** | Azure + Databricks | Paid sandbox with full feature access |
-| **History Tracking** | SCD Type 2 | Enables lifecycle analytics (time-in-status, transitions) |
-| **Data Quality** | Great Expectations | Declarative validation with data docs |
-| **Pipeline** | Lakeflow Declarative (SQL) | Simplicity, built-in SCD2 via `APPLY CHANGES INTO` |
-| **ML Tracking** | MLflow | Native Databricks integration |
-| **Forecasting** | Prophet | Handles seasonality, missing data, holidays |
-| **Storage** | ADLS Gen2 + Delta Lake | ACID transactions, time travel, Unity Catalog |
-| **IaC** | Terraform (azurerm) | Reproducible Azure infrastructure |
-
-### Technology Stack
-
-| Layer | Technology | Why This Choice |
-|-------|------------|-----------------|
-| **Cloud** | Microsoft Azure | Paid sandbox environment with full capabilities |
-| **Compute** | Azure Databricks | Managed Spark, Lakeflow, Unity Catalog |
-| **Storage** | ADLS Gen2 + Delta Lake | ACID transactions, time travel, governance |
-| **ETL** | Lakeflow Declarative Pipelines | Declarative SQL, auto-optimization |
-| **SCD2** | `APPLY CHANGES INTO` | Built-in CDC handling for history tracking |
-| **ML Tracking** | MLflow | Native Databricks integration, experiment management |
-| **Forecasting** | Prophet | Handles seasonality, missing data, outliers |
-| **Dashboard** | Streamlit | Fast prototyping, Python native |
-| **IaC** | Terraform (azurerm) | Azure resource provisioning |
-| **CI/CD** | GitHub Actions | Free tier, Databricks CLI integration |
 
 ---
 
-## 🏗️ ML Portfolio Framework Alignment
+## 🛠️ Technology Stack
 
-| Framework Element | Implementation | Status |
-|-------------------|----------------|--------|
-| **Problem Framing** | 311 demand forecasting & anomaly detection | ✅ |
-| **Data Sourcing** | Chicago 311 API (Socrata) with incremental loads | ✅ |
-| **Data Quality** | Great Expectations at Bronze/Silver/Gold layers | ✅ |
-| **Feature Engineering** | Temporal, lag, rolling, calendar features | ✅ |
-| **Model Development** | Prophet + MLflow experiment tracking | ✅ |
-| **Deployment** | Batch predictions + Streamlit dashboard | ✅ |
-| **Monitoring** | Prediction logging, data drift, DQ dashboards | ✅ |
-| **Documentation** | Project scoping, architecture decisions, runbooks | ✅ |
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Cloud** | Microsoft Azure | Subscription-based sandbox |
+| **Compute** | Azure Databricks (Premium SKU) | Managed Spark, Lakeflow, MLflow |
+| **Storage** | ADLS Gen2 + Delta Lake | ACID transactions, time travel, medallion architecture |
+| **ETL** | Lakeflow Declarative Pipelines (SQL) | Declarative SCD2 via `APPLY CHANGES INTO` |
+| **Data Quality** | Great Expectations 0.18 | Declarative validation with persistent data docs |
+| **ML Tracking** | MLflow | Experiment management, model registry |
+| **Forecasting** | Prophet | Handles seasonality, holidays, missing data |
+| **Feature Store** | Custom feature engineering library | Temporal, lag, rolling features |
+| **Dashboard** | Streamlit + Plotly | Live monitoring and forecast visualisation |
+| **IaC** | Terraform (azurerm ~3.80) | Reproducible Azure resource provisioning |
+| **CI/CD** | GitHub Actions | Linting, unit tests, automated bundle deploy |
+| **Orchestration** | Databricks Asset Bundle (DAB) | Jobs + DLT pipeline lifecycle management |
+| **Alerting** | Azure Monitor scheduled query rules | Email on job failure via Log Analytics |
+
+---
+
+## 📁 Project Structure
+
+```
+chi311-ml-platform/
+│
+├── README.md
+├── databricks.yml                       # Databricks Asset Bundle (jobs + pipeline)
+├── requirements.txt                     # Production dependencies
+├── requirements-dev.txt                 # Dev dependencies (ruff, black, mypy, pytest)
+├── setup.py
+├── pytest.ini
+├── .gitignore
+│
+├── notebooks/
+│   ├── 01_setup/
+│   │   └── 00_setup_exploration.py      # Catalog, schemas, volumes, EDA
+│   ├── 02_ingestion/
+│   │   ├── 01_api_to_volume.py          # Chicago 311 API → ADLS Volume
+│   │   └── 02_bronze_autoloader.py      # Autoloader: Volume → Bronze Delta table
+│   ├── 03_data_quality/
+│   │   └── 01_data_quality_checks.py    # GE validation + checkpoint persistence
+│   └── 04_ml/
+│       ├── 01_forecasting.py            # Prophet training + MLflow tracking
+│       └── 02_anomaly_detection.py      # Statistical anomaly detection
+│
+├── pipelines/
+│   └── chi311_scd2_pipeline.sql         # Lakeflow DLT: Silver SCD2 + Gold aggregates
+│                                        # Includes CONSTRAINT expectations on every table
+│
+├── src/chi311/
+│   ├── ingestion/
+│   │   └── api_client.py                # Paginated Socrata client with retry + logging
+│   ├── features/
+│   │   └── feature_engineering.py       # Temporal, lag, rolling features with logging
+│   ├── models/
+│   │   └── prophet_forecaster.py        # Prophet wrapper: prepare_data, train, predict
+│   └── monitoring/
+│       ├── prediction_logger.py         # Delta MERGE upsert + drift detection
+│       └── pipeline_metrics.py          # Per-task row counts + duration logging
+│
+├── tests/
+│   ├── unit/
+│   │   └── test_feature_engineering.py  # 7 tests — all passing in CI
+│   └── integration/
+│       └── tests_pipeline_e2e.py
+│
+├── app/
+│   ├── dashboard.py                     # Streamlit: 3-tab dashboard
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── infrastructure/terraform/
+│   ├── main.tf                          # All Azure resources + Monitor alert
+│   ├── variables.tf
+│   ├── outputs.tf
+│   └── terraform.tfvars                 # (gitignored) secrets + workspace IDs
+│
+└── .github/workflows/
+    └── ci.yml                           # 4-stage CI/CD pipeline
+```
 
 ---
 
@@ -118,196 +170,223 @@ An end-to-end ML platform that:
 
 ### Prerequisites
 
-- Azure subscription with Databricks sandbox workspace
+- Azure subscription with Databricks workspace
 - Python 3.11+
-- Git
-- Terraform CLI (for infrastructure provisioning)
+- Terraform CLI ≥ 1.5
 - Azure CLI (`az login`)
 
-### Step 1: Clone Repository
+### 1 — Clone and install
 
 ```bash
 git clone https://github.com/udayjoshi-captech/chi311-ml-platform.git
-cd chi311-intelligence-platform
+cd chi311-ml-platform
+python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+pip install -e .
 ```
 
-### Step 2: Deploy Azure Infrastructure
+### 2 — Deploy Azure infrastructure
 
 ```bash
 cd infrastructure/terraform
 az login
 terraform init
-terraform plan -var="environment=dev"
-terraform apply -var="environment=dev"
+terraform apply
 ```
 
-### Step 3: Configure Databricks Workspace
+Minimum `terraform.tfvars`:
+
+```hcl
+azure_subscription_id            = "<your-subscription-id>"
+owner_email                      = "<your-email>"
+alert_email                      = "<your-email>"
+monthly_budget                   = 100
+databricks_workspace_url         = "https://adb-<id>.azuredatabricks.net"
+databricks_workspace_resource_id = "/subscriptions/.../workspaces/<name>"
+```
+
+### 3 — Deploy Databricks Asset Bundle
 
 ```bash
-# Install Databricks CLI
-pip install databricks-cli
-
-# Configure with your Azure Databricks workspace URL
-databricks configure --token
-# Enter your workspace URL: https://adb-XXXXX.azuredatabricks.net
-# Enter your PAT token
-
-# Import notebooks
-databricks workspace import_dir ./notebooks /Workspace/Users/YOUR_EMAIL/chi311
+cd ../..
+databricks bundle deploy -t dev
 ```
 
-### Step 4: Set Up Unity Catalog Volumes
+Creates 3 jobs and 1 Lakeflow DLT pipeline in the dev workspace.
 
-1. Open `notebooks/01_setup/00_setup_exploration.py` in Databricks
-2. Run all cells to create catalog, schemas, and volumes
+### 4 — Run ingestion and ML jobs
 
-### Step 5: Run Data Ingestion
+```bash
+databricks bundle run -t dev daily_ingestion
+databricks bundle run -t dev data_quality
+databricks bundle run -t dev ml_training
+```
 
-1. Open `notebooks/02_ingestion/01_api_to_volume.py`
-2. Run to fetch data from Chicago 311 API into Databricks Volume
-
-### Step 6: Create Lakeflow Pipeline
-
-1. Navigate to **Workflows** → **Lakeflow Declarative Pipelines**
-2. Click **Create Pipeline**
-3. Point to `pipelines/chi311_scd2_pipeline.sql`
-4. Configure: **Serverless** or cluster compute, **Development mode**
-5. Run the pipeline
-
-### Step 7: Run ML Training
-
-1. Open `notebooks/04_ml/01_forecasting.py`
-2. Attach to compute
-3. Run all cells — MLflow tracks experiments automatically
-
-### Step 8: Launch Dashboard (Local)
+### 5 — Launch dashboard locally
 
 ```bash
 cd app
 pip install -r requirements.txt
+DATABRICKS_HOST=https://adb-<id>.azuredatabricks.net \
+DATABRICKS_TOKEN=<your-pat> \
+DATABRICKS_CATALOG=workspace \
 streamlit run dashboard.py
 ```
 
 ---
 
-## 📁 Project Structure
+## ⚙️ CI/CD Pipeline
+
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push to `main`:
 
 ```
-chi311-intelligence-platform/
-│
-├── README.md                           # This file
-├── SETUP_GUIDE.md                      # Detailed Azure setup instructions
-├── databricks.yml                      # Databricks Asset Bundle config
-├── requirements.txt                    # Production dependencies
-├── requirements-dev.txt                # Development dependencies
-├── setup.py                            # Python package config
-├── pytest.ini                          # Test configuration
-├── .gitignore                          # Git ignore rules
-│
-├── docs/
-│   ├── PROJECT_SCOPING.md              # Problem framing & success metrics
-│   ├── DATA_SOURCING.md                # Data source documentation
-│   ├── ARCHITECTURE_DECISIONS.md       # ADRs and alternatives considered
-│   ├── PIPELINE_EXPLAINED.md           # Beginner-friendly pipeline guide
-│   └── COST_ANALYSIS.md                # Azure cost breakdown
-│
-├── notebooks/
-│   ├── 01_setup/
-│   │   └── 00_setup_exploration.py     # Catalog, schemas, volumes, EDA
-│   ├── 02_ingestion/
-│   │   ├── 01_api_to_volume.py         # Chicago 311 API → Volume
-│   │   └── 02_bronze_autoloader.py     # Autoloader: Volume → Bronze table
-│   ├── 03_data_quality/
-│   │   └── 01_data_quality_checks.py   # Great Expectations validation
-│   └── 04_ml/
-│       ├── 01_forecasting.py           # Prophet + MLflow training
-│       └── 02_anomaly_detection.py     # Anomaly detection pipeline
-│
-├── pipelines/
-│   └── chi311_scd2_pipeline.sql        # Lakeflow DLT: Silver SCD2 + Gold
-│
-├── src/chi311/
-│   ├── __init__.py
-│   ├── ingestion/
-│   │   ├── __init__.py
-│   │   └── api_client.py               # Robust Socrata API client
-│   ├── features/
-│   │   ├── __init__.py
-│   │   └── feature_engineering.py       # Temporal & lag features
-│   ├── models/
-│   │   ├── __init__.py
-│   │   └── prophet_forecaster.py        # Prophet wrapper with MLflow
-│   └── monitoring/
-│       ├── __init__.py
-│       └── prediction_logger.py         # Prediction logging & drift
-│
-├── tests/
-│   ├── unit/
-│   │   ├── test_api_client.py
-│   │   └── test_feature_engineering.py
-│   └── integration/
-│       └── test_pipeline_e2e.py
-│
-├── app/
-│   ├── dashboard.py                     # Streamlit dashboard
-│   ├── requirements.txt                 # Dashboard dependencies
-│   └── Dockerfile                       # Container for deployment
-│
-├── infrastructure/
-│   └── terraform/
-│       ├── main.tf                      # Azure resources (RG, ADLS, Databricks)
-│       ├── variables.tf                 # Terraform variables
-│       └── outputs.tf                   # Terraform outputs
-│
-└── .github/
-    └── workflows/
-        └── ci.yml                       # CI/CD pipeline
+Code Quality → Unit Tests → Deploy to Dev → Deploy to Prod (disabled)
 ```
+
+| Stage | What it does |
+|---|---|
+| **Code Quality** | `ruff check` + `black --check` + `mypy` (warn-only) on `src/` and `tests/` |
+| **Unit Tests** | `pytest tests/unit` with `--cov=src/chi311` coverage report |
+| **Deploy to Dev** | `databricks bundle deploy -t dev` using environment secrets |
+| **Deploy to Prod** | Disabled (`if: false`) — enable by adding secrets to `production` environment |
+
+### Required GitHub environment secrets (Settings → Environments → dev)
+
+| Secret | Value |
+|---|---|
+| `DATABRICKS_HOST` | `https://adb-<workspace-id>.azuredatabricks.net` |
+| `DATABRICKS_TOKEN` | Databricks PAT (workspace → Settings → Developer → Access tokens) |
 
 ---
 
-## 📊 Success Metrics
+## 📦 Databricks Asset Bundle
 
-| Metric Type | Metric | Target | Current |
-|-------------|--------|--------|---------|
-| **Business** | Anomaly Detection Lead Time | >2 hours before spike | TBD |
-| **Business** | False Positive Rate | <15% | TBD |
-| **ML** | Forecast MAPE | <15% | TBD |
-| **ML** | Anomaly Precision | >0.80 | TBD |
-| **Data** | Pipeline Freshness | <4 hours | TBD |
-| **Data** | DQ Pass Rate | >95% | TBD |
+`databricks.yml` configures all dev and prod resources. Dev clusters use **single-node spot pricing** for cost efficiency.
+
+### Dev jobs
+
+| Job | Schedule | Cluster |
+|---|---|---|
+| `[DEV] Chi311 Daily Ingestion` | 6 AM daily (paused) | `Standard_DS3_v2`, single-node, spot |
+| `[DEV] Chi311 Data Quality` | On-demand | `Standard_DS3_v2`, single-node, spot |
+| `[DEV] Chi311 ML Training` | Monday 8 AM (paused) | `Standard_DS3_v2`, single-node, spot |
+
+### Lakeflow DLT pipeline
+
+| Setting | Value |
+|---|---|
+| Name | `[DEV] Chi311 Lakeflow Pipeline` |
+| Source | `pipelines/chi311_scd2_pipeline.sql` |
+| Cluster | `Standard_DS3_v2`, 1 worker, spot pricing |
+| Mode | Development |
 
 ---
 
-## 💰 Cost Analysis
+## 🔍 Monitoring & Observability
 
-See [docs/COST_ANALYSIS.md](docs/COST_ANALYSIS.md) for detailed breakdown.
+### 1. Pipeline Run Metrics — `gold.pipeline_run_log`
+
+Wrap every notebook task with `PipelineMetrics` to record row counts, duration, and status:
+
+```python
+from chi311.monitoring import PipelineMetrics
+
+metrics = PipelineMetrics(catalog="workspace")
+metrics.start(task_name="bronze_autoloader", run_id="<run-id>")
+try:
+    # ... transformation logic ...
+    PipelineMetrics.assert_non_empty(df_out, "bronze output")  # raises on empty
+    metrics.finish(rows_in=rows_in, rows_out=df_out.count(), spark_session=spark)
+except Exception as e:
+    metrics.fail(str(e), spark_session=spark)
+    raise
+```
+
+Columns: `run_id`, `task_name`, `status`, `rows_in`, `rows_out`, `rows_dropped`, `duration_seconds`, `error_message`, `logged_at`.
+
+### 2. Prediction Drift Detection — `gold.gold_prediction_log`
+
+`PredictionLogger` upserts predictions via Delta MERGE on `(ds, model_version)` — idempotent on reruns. `check_drift()` computes MAPE against actuals and emits `logger.warning` when the threshold (default 20%) is exceeded.
+
+### 3. Data Quality Checkpoints — `gold.dq_checkpoint_results`
+
+After every DQ notebook run, Great Expectations results (evaluated / passed / failed / pass rate %) are persisted to a queryable Delta table. HTML data docs are built to the ADLS `checkpoints` container.
+
+### 4. Azure Monitor Alert
+
+A scheduled query rule polls Log Analytics every 15 minutes for `DatabricksJobs runFailed` events and sends an email to `alert_email` on any failure. Provisioned automatically by Terraform.
+
+### 5. Streamlit Dashboard — three tabs
+
+| Tab | Contents |
+|---|---|
+| 📊 Service Requests | KPI cards, daily volume trend chart |
+| 🔮 Forecast & Anomalies | 7-day forecast with confidence bands, anomaly detection table |
+| 🔍 Monitoring & Observability | Pipeline health KPIs, colour-coded run history, row-count bar chart, prediction log viewer, DQ pass-rate trend vs 95% threshold |
+
+---
+
+## 🏗️ Data Engineering Practices
+
+| Practice | Implementation |
+|---|---|
+| **Structured logging** | `logging.getLogger(__name__)` in all modules; row counts logged at each stage |
+| **Idempotent writes** | Delta MERGE on natural keys — safe to rerun without duplicates |
+| **Schema enforcement** | DLT `CONSTRAINT` on silver/gold (`ON VIOLATION DROP ROW` or `WARN`) |
+| **Empty dataset guards** | `PipelineMetrics.assert_non_empty()` raises if any stage produces 0 rows |
+| **Retry with backoff** | `Chi311APIClient` retries with exponential backoff; raises after exhausting retries |
+| **No hardcoded config** | Catalog names, workspace URLs, tokens all from environment variables or secrets |
+| **Spot pricing** | All dev clusters use `SPOT_WITH_FALLBACK_AZURE` — 60–80% cost reduction |
+| **Single-node clusters** | `num_workers: 0` with `local[*]` Spark — eliminates worker VM cost in dev |
+
+---
+
+## 💰 Cost Management
+
+Monthly budget alert: **$100** (`chi311-dev-budget`, Azure Cost Management).
 
 | Component | Estimated Monthly Cost |
-|-----------|----------------------|
-| Azure Databricks Compute (sandbox) | Included in subscription |
-| ADLS Gen2 Storage (~15 GB) | ~$0.30 |
-| Azure Monitor / Log Analytics | ~$1.00 |
-| Streamlit Dashboard (local) | $0.00 |
-| **Total Infrastructure** | **~$1.30/month** |
+|---|---|
+| Databricks workspace (idle overhead) | ~$30–50 |
+| Compute per job run (`DS3_v2` spot, ~10 min) | ~$0.05–0.10 per run |
+| ADLS Gen2 storage (~15 GB) | ~$0.30 |
+| Log Analytics (30-day retention minimum) | ~$1–3 |
+| Azure Monitor alert rule | ~$0.10 |
+| **Total (light dev usage)** | **~$35–60/month** |
 
-> **Note**: With a paid Azure Databricks sandbox, compute costs are covered by the subscription. Infrastructure costs are minimal — primarily storage and monitoring.
+Single-node spot clusters cut per-run compute cost by ~80% vs the original two-node on-demand configuration.
 
 ---
 
 ## 🔑 Key Findings from Data Exploration
 
 | Finding | Value | Impact |
-|---------|-------|--------|
-| Daily service requests | ~3,000 (excl. info calls) | Baseline for forecasting |
-| Info calls share | ~40% ("311 INFORMATION ONLY CALL") | Must filter for ML |
+|---|---|---|
+| Daily service requests | ~3,000 (excl. info calls) | Forecasting baseline |
+| Info calls share | ~40% (`"311 INFORMATION ONLY CALL"`) | Must filter before ML |
 | Status values | Open, Completed, Canceled | SCD2 tracking targets |
 | Anomaly threshold | 4,851 (mean + 2σ) | Detection baseline |
-| Weekend drop | 35-40% | Seasonality feature |
-| Ward 28 dominance | 39% of requests | Info call admin ward |
+| Weekend drop | 35–40% | Seasonality feature |
+| Ward 28 dominance | 39% of requests | Info call admin ward — excluded |
+
+---
+
+## 🏗️ ML Portfolio Framework Alignment
+
+| Framework Element | Implementation | Status |
+|---|---|---|
+| **Problem Framing** | 311 demand forecasting & anomaly detection | ✅ |
+| **Data Sourcing** | Chicago 311 API (Socrata) with paginated incremental loads | ✅ |
+| **Data Quality** | Great Expectations at Bronze/Silver + DLT constraints at Silver/Gold | ✅ |
+| **Feature Engineering** | Temporal, lag, rolling features with row-count logging | ✅ |
+| **Model Development** | Prophet + MLflow experiment tracking | ✅ |
+| **Deployment** | Databricks Asset Bundle (3 jobs + 1 DLT pipeline) deployed via CI | ✅ |
+| **Monitoring** | PipelineMetrics, PredictionLogger, DQ checkpoints, Azure Monitor alerts | ✅ |
+| **CI/CD** | GitHub Actions: lint → unit tests → deploy-dev | ✅ |
+| **IaC** | All Azure resources managed by Terraform, idempotent plan | ✅ |
 
 ---
 
 ## 📄 License
 
-This project is for portfolio/educational purposes. Data sourced from [Chicago Open Data Portal](https://data.cityofchicago.org/) under open data license.
+This project is for portfolio/educational purposes. Data sourced from the [Chicago Open Data Portal](https://data.cityofchicago.org/) under open data licence.
