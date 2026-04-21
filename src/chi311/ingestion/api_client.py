@@ -28,7 +28,7 @@ class Chi311APIClient:
 
     def __init__(self, config: Optional[APIConfig] = None):
         self.config = config or APIConfig()
-        self.sessions = requests.Session()
+        self.session = requests.Session()
         if self.config.app_token:
             self.session.headers.update({"X-App-Token": self.config.app_token})
 
@@ -50,7 +50,7 @@ class Chi311APIClient:
                 )
                 response.raise_for_status()
                 records = response.json()
-                logger.info(f"Fetched{len(records)} records (offset={offset})")
+                logger.info(f"Fetched {len(records)} records (offset={offset})")
                 return records
 
             except requests.exceptions.RequestException as e:
@@ -66,7 +66,7 @@ class Chi311APIClient:
 
         return []
 
-    def fetch_all(self, start_date: str, end_date: str) -> list(dict):
+    def fetch_all(self, start_date: str, end_date: str) -> list[dict]:
         """Fetch all records for a date range with pagination"""
         all_records = []
         offset = 0

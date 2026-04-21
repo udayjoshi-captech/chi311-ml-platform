@@ -2,11 +2,15 @@
 Prophet model wrapper with MLflow integration.
 """
 
+import logging
+
 import mlflow
 from prophet import Prophet
 import pandas as pd
 import numpy as np
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # Minimum rows required for a reliable Prophet fit
 MIN_TRAINING_POINTS = 10
@@ -82,9 +86,11 @@ class Chi311Forecaster:
 
         rows_removed = pre_clean - len(pdf)
         if rows_removed > 0:
-            print(
-                f"Data prep: {pre_clean} -> {len(pdf)} rows"
-                f"(removed {rows_removed} nulls/dupes/future)"
+            logger.info(
+                "Data prep: %d -> %d rows (removed %d nulls/dupes/future)",
+                pre_clean,
+                len(pdf),
+                rows_removed,
             )
 
         # Validate minimum data points

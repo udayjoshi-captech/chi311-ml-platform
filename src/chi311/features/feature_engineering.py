@@ -3,7 +3,11 @@ Feature engineering for Prophet forecasting.
 Generates temporal, lag and rolling features from Gold daily summaries.
 """
 
+import logging
+
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -16,6 +20,7 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
     df["week_of_year"] = df["ds"].dt.isocalendar().week.astype(int)
     df["is_month_start"] = df["ds"].dt.is_month_start.astype(int)
     df["is_month_end"] = df["ds"].dt.is_month_end.astype(int)
+    logger.info("add_temporal_features: %d rows, 7 features added", len(df))
     return df
 
 
@@ -26,6 +31,7 @@ def add_lag_features(df: pd.DataFrame, lags: list = None) -> pd.DataFrame:
     df = df.copy()
     for lag in lags:
         df[f"lag_{lag}"] = df["y"].shift(lag)
+    logger.info("add_lag_features: %d rows, lags=%s", len(df), lags)
     return df
 
 
@@ -37,12 +43,17 @@ def add_rolling_features(df: pd.DataFrame, windows: list = None) -> pd.DataFrame
     for w in windows:
         df[f"rolling_mean_{w}d"] = df["y"].rolling(w, min_periods=1).mean()
         df[f"rolling_std_{w}d"] = df["y"].rolling(w, min_periods=1).std()
+    logger.info("add_rolling_features: %d rows, windows=%s", len(df), windows)
     return df
 
 
 def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
     "Full feature engineering pipeline"
+    logger.info("prepare_features: input %d rows", len(df))
     df = add_temporal_features(df)
     df = add_lag_features(df)
     df = add_rolling_features(df)
+    logger.info(
+        "prepare_features: output %d rows, %d columns", len(df), len(df.columns)
+    )
     return df

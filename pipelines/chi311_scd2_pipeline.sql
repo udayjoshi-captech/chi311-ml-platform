@@ -97,7 +97,11 @@ WHERE
 -- SILVER LAYER: SCD Type 2 History Table
 -- =============================================================================
 
-CREATE STREAMING TABLE silver_scd2_311_requests
+CREATE STREAMING TABLE silver_scd2_311_requests (
+    CONSTRAINT valid_sr_number EXPECT (sr_number IS NOT NULL) ON VIOLATION DROP ROW,
+    CONSTRAINT valid_created_date EXPECT (created_date IS NOT NULL) ON VIOLATION DROP ROW,
+    CONSTRAINT valid_status EXPECT (status IN ('Open', 'Completed', 'Canceled')) ON VIOLATION WARN
+)
 COMMENT "SCD2 Type 2 history of 311 requests - tracks all status changes over time"
 TBLPROPERTIES (
     "quality" = "silver",
@@ -126,7 +130,6 @@ SELECT
     status,
     street_address,
     city,
-    status,
     zip_code,
     ward,
     community_area,
@@ -139,7 +142,7 @@ SELECT
     is_info_call,
     is_admin_ward_info_call,
     _START_AT AS valid_from,
-    _END_AT AS valid_to,
+    _END_AT AS valid_to
 FROM LIVE.silver_scd2_311_requests
 WHERE _END_AT IS NULL;
 
@@ -147,7 +150,10 @@ WHERE _END_AT IS NULL;
 -- GOLD LAYER: Daily Aggregates (Service Requests Only)
 -- =============================================================================
 
-CREATE LIVE TABLE gold_daily_service_request_summary
+CREATE LIVE TABLE gold_daily_service_request_summary (
+    CONSTRAINT valid_request_date EXPECT (request_date IS NOT NULL) ON VIOLATION DROP ROW,
+    CONSTRAINT positive_request_count EXPECT (total_requests > 0) ON VIOLATION WARN
+)
 COMMENT "Daily aggregates of 311 service requests (excluding info calls)"
 TBLPROPERTIES ("quality" = "gold")
 AS
@@ -175,7 +181,7 @@ COUNT(DISTINCT ward) AS unique_wards,
 COUNT(DISTINCT community_area) AS unique_community_areas,
 
 -- Day of week (for seasonality features)
-DAYOFWEEK(created_date) AS month_num,
+DAYOFWEEK(created_date) AS day_of_week_num,
 CASE WHEN DAYOFWEEK(created_date) IN (1, 7) THEN TRUE ELSE FALSE END AS is_weekend,
 
 -- Month (for seasonality)
@@ -184,7 +190,7 @@ YEAR(created_date) AS year_num
 
 FROM LIVE.silver_current_311_requests
 WHERE is_info_call = FALSE
-GROUP BY DATE(created_date), DAYOFWEEK(created_date), MONTH(created_date), YEAR(created_date)
+GROUP BY DATE(created_date), DAYOFWEEK(created_date), MONTH(created_date), YEAR(created_date);
 
 -- =============================================================================
 -- GOLD LAYER: Request Type Daily Summary
@@ -277,5 +283,5 @@ SELECT
     END AS volume_status
 FROM LIVE.silver_current_311_requests
 GROUP BY DATE(created_date)
-ORDER BY request_date DESC
+ORDER BY request_date DESC;
 LIMIT 30;
