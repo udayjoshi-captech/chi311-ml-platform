@@ -152,6 +152,7 @@ venv.bak/
 .terraform/
 *.tfstate
 *.tfstate.backup
+*.tfstate.*.backup
 .terraform.lock.hcl
 .tf-plugin-cache/
 
