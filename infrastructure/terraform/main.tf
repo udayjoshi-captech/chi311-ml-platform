@@ -247,6 +247,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "job_failures" {
             DatabricksJobs
             | where TimeGenerated > ago(15m)
             | where ActionName == "runFailed"
+            | where parse_json(RequestParams).runCreatorUserName == "ujoshi@captechconsulting.com"
             | summarize FailedRuns = count() by bin(TimeGenerated, 15m)
         QUERY
 
