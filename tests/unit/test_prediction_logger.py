@@ -57,7 +57,7 @@ class TestLogPredictions:
         logger = PredictionLogger(catalog="chi311")
         df = pd.DataFrame({"date": ["2024-01-01"], "value": [100]})
 
-        with pytest.raises(ValueError, match="Missing required columns"):
+        with pytest.raises(ValueError, match="missing required columns"):
             logger.log_predictions(df, "v1.0", spark_session=mock_spark)
 
     def test_log_predictions_validates_spark_session_is_active(self, sample_predictions):
@@ -84,7 +84,7 @@ class TestLogPredictions:
         mock_df.write.format.assert_called_once_with("delta")
         mock_df.write.format().mode.assert_called_once_with("overwrite")
 
-    @patch("chi311.monitoring.prediction_logger.DeltaTable")
+    @patch("delta.tables.DeltaTable")
     def test_log_predictions_merges_if_table_exists(
         self, mock_delta_table, mock_spark, sample_predictions
     ):
@@ -126,10 +126,10 @@ class TestLogPredictions:
         with pytest.raises(ValueError, match="Invalid prediction schema"):
             logger.log_predictions(sample_predictions, "v1.0", spark_session=mock_spark)
 
-    @patch("chi311.monitoring.prediction_logger.DeltaTable")
-    @patch("chi311.monitoring.prediction_logger.time")
+    @patch("delta.tables.DeltaTable")
+    @patch("time.sleep")
     def test_log_predictions_retries_on_concurrent_write(
-        self, mock_time, mock_delta_table, mock_spark, sample_predictions
+        self, mock_sleep, mock_delta_table, mock_spark, sample_predictions
     ):
         """Should retry on ConcurrentAppendException."""
         from pyspark.sql.utils import AnalysisException

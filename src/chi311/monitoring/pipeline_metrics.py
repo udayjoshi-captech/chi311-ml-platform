@@ -166,7 +166,12 @@ class PipelineMetrics:
 
         Use after every read/transform to catch silent empty-dataset failures.
         """
-        count = df.count() if hasattr(df, "count") else len(df)
+        # Handle both pandas DataFrame (len) and Spark DataFrame (count)
+        if hasattr(df, "rdd"):  # Spark DataFrame
+            count = df.count()
+        else:  # Pandas DataFrame
+            count = len(df)
+
         if count == 0:
             raise ValueError(
                 f"Empty dataset at checkpoint '{label}'. "

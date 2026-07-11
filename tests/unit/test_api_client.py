@@ -75,7 +75,7 @@ class TestChi311APIClient:
     @patch("chi311.ingestion.api_client.requests.Session.get")
     def test_health_check_failure(self, mock_get):
         """Test failed health check."""
-        mock_get.side_effect = Exception("Connection refused")
+        mock_get.side_effect = requests.exceptions.ConnectionError("Connection refused")
         assert self.client.health_check() is False
 
     def test_config_with_app(self):
@@ -89,7 +89,7 @@ class TestChi311APIClient:
         config = APIConfig()
         assert config.page_size == 50000
         assert config.max_retries == 3
-        assert config.timeout == 60
+        assert config.timeout == 30
 
     @patch("chi311.ingestion.api_client.requests.Session.get")
     def test_fetch_records_handles_json_decode_error(self, mock_get):

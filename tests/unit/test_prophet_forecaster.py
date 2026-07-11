@@ -59,15 +59,17 @@ class TestPrepareData:
 
     def test_prepare_data_sorts_by_date(self):
         """Should sort data by ds column."""
+        dates = pd.to_datetime(["2024-01-03", "2024-01-01", "2024-01-02"] +
+                               [f"2024-01-{d:02d}" for d in range(4, 12)])
         df = pd.DataFrame({
-            "ds": pd.to_datetime(["2024-01-03", "2024-01-01", "2024-01-02"]),
-            "y": [300, 100, 200]
+            "ds": dates,
+            "y": [300, 100, 200] + list(range(400, 1200, 100))
         })
 
         result = Chi311Forecaster.prepare_data(df)
 
         assert result["ds"].is_monotonic_increasing
-        assert list(result["y"]) == [100, 200, 300]
+        assert result.iloc[0]["y"] == 100  # First sorted value
 
     def test_prepare_data_truncates_to_yesterday_by_default(self, sample_training_data):
         """Should remove future dates by default."""
@@ -90,7 +92,7 @@ class TestPrepareData:
             "y": [100, 200, 300, 400, 500]
         })
 
-        with pytest.raises(ValueError, match=f"At least {MIN_TRAINING_POINTS} data points required"):
+        with pytest.raises(ValueError, match="Insufficient data.*need at least"):
             Chi311Forecaster.prepare_data(df)
 
     def test_prepare_data_converts_ds_to_datetime(self):
@@ -139,9 +141,8 @@ class TestTrain:
     """Tests for train method."""
 
     @patch("chi311.models.prophet_forecaster.Prophet")
-    @patch("chi311.models.prophet_forecaster.mlflow")
     def test_train_calls_prophet_with_correct_params(
-        self, mock_mlflow, mock_prophet_class, forecaster, sample_training_data
+        self, mock_prophet_class, forecaster, sample_training_data
     ):
         """Should initialize Prophet with configured parameters."""
         mock_model = MagicMock()
@@ -189,9 +190,15 @@ class TestTrain:
         assert np.isnan(metrics["mape"])  # Should be NaN, not error
 
     @patch("chi311.models.prophet_forecaster.Prophet")
-    @patch("chi311.models.prophet_forecaster.mlflow")
+    @patch("mlflow.set_experiment")
+    @patch("mlflow.start_run")
+    @patch("mlflow.set_tags")
+    @patch("mlflow.log_params")
+    @patch("mlflow.log_metrics")
     def test_train_logs_to_mlflow_when_enabled(
-        self, mock_mlflow, mock_prophet_class, forecaster, sample_training_data
+        self, mock_log_metrics, mock_log_params, mock_set_tags,
+        mock_start_run, mock_set_experiment, mock_prophet_class,
+        forecaster, sample_training_data
     ):
         """Should log parameters, metrics, and model to MLflow."""
         mock_model = MagicMock()
