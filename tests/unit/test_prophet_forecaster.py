@@ -98,8 +98,8 @@ class TestPrepareData:
     def test_prepare_data_converts_ds_to_datetime(self):
         """Should convert ds column to datetime if it's not already."""
         df = pd.DataFrame({
-            "ds": ["2024-01-01", "2024-01-02", "2024-01-03"] + ["2024-01-04"] * 10,
-            "y": [100, 200, 300] + [400] * 10
+            "ds": [f"2024-01-{i:02d}" for i in range(1, 14)],  # 13 unique dates
+            "y": list(range(100, 1400, 100))
         })
 
         result = Chi311Forecaster.prepare_data(df)
@@ -195,9 +195,12 @@ class TestTrain:
     @patch("mlflow.set_tags")
     @patch("mlflow.log_params")
     @patch("mlflow.log_metrics")
+    @patch("mlflow.prophet.log_model")
+    @patch("mlflow.log_dict")
     def test_train_logs_to_mlflow_when_enabled(
-        self, mock_log_metrics, mock_log_params, mock_set_tags,
-        mock_start_run, mock_set_experiment, mock_prophet_class,
+        self, mock_log_dict, mock_log_model, mock_log_metrics,
+        mock_log_params, mock_set_tags, mock_start_run,
+        mock_set_experiment, mock_prophet_class,
         forecaster, sample_training_data
     ):
         """Should log parameters, metrics, and model to MLflow."""
@@ -217,6 +220,7 @@ class TestTrain:
         mock_start_run.assert_called_once()
         mock_log_params.assert_called_once()
         mock_log_metrics.assert_called_once()
+        mock_log_model.assert_called_once()  # Verify model was logged
 
 
 class TestPredict:
