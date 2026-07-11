@@ -174,7 +174,7 @@ AVG(
     CASE WHEN closed_date IS NOT NULL
     THEN TIMESTAMPDIFF(HOUR, created_date, closed_date)
     END
-) AS avg_resolution_hours
+) AS avg_resolution_hours,
 
 -- Location spread
 COUNT(DISTINCT ward) AS unique_wards,
@@ -283,5 +283,5 @@ SELECT
     END AS volume_status
 FROM LIVE.silver_current_311_requests
 GROUP BY DATE(created_date)
-ORDER BY request_date DESC;
+ORDER BY request_date DESC
 LIMIT 30;

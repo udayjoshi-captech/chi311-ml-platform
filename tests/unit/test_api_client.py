@@ -3,7 +3,8 @@
 import pytest
 import requests
 from unittest.mock import patch, MagicMock
-from chi311.ingestion.api_client import Chi311APIClient, APIConfig
+from chi311.ingestion.api_client import Chi311APIClient
+from chi311.config import APIConfig
 
 
 class TestChi311APIClient:

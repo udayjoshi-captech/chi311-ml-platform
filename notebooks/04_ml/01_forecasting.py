@@ -65,9 +65,9 @@ df_features["ds"] = pd.to_datetime(df_features["ds"])
 # COMMAND -----------
 
 # Reserve last 30 days for testing
-split_date = pdf["ds"].max() - pd.Timedelta(days=30)
-train = pdf[pdf["ds"] <= split_date].copy()
-test = pdf[pdf["ds"] > split_date].copy()
+split_date = df_features["ds"].max() - pd.Timedelta(days=30)
+train = df_features[df_features["ds"] <= split_date].copy()
+test = df_features[df_features["ds"] > split_date].copy()
 
 print(f"Training: {len(train)} days ({train['ds'].min()} to {train['ds'].max()})")
 print(f"Testing: {len(test)} days ({test['ds'].min()} to {test['ds'].max()})")
@@ -192,7 +192,7 @@ future_7d = best_model.make_future_dataframe(periods=7)
 forecast_7d = best_model.predict(future_7d)
 
 # Show next 7 days
-forecast_next = forecast_7d[forecast_7d["ds"] > pdf["ds"].max()][
+forecast_next = forecast_7d[forecast_7d["ds"] > df_features["ds"].max()][
     ["ds", "yhat", "yhat_lower", "yhat_upper"]
 ].round(0)
 
