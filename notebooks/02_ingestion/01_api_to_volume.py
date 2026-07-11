@@ -21,13 +21,18 @@ import requests
 import json
 from datetime import datetime, timedelta
 from pyspark.sql import functions as F
+from chi311.config import PipelineConfig
 
 # API Configuration
 API_URL = "https://data.cityofchicago.org/resource/v6vf-nfxy.json"
 API_LIMIT = 50000 # Max records per request
 
+# Load config for initial load days
+config = PipelineConfig()
+CATALOG = config.catalog
+INITIAL_LOAD_DAYS = config.initial_load_days
+
 # Volume paths
-CATALOG = "chi311"
 LANDING_PATH = f"/Volumes/{CATALOG}/raw/chi311_landing"
 INITIAL_PATH = f"{LANDING_PATH}/initial"
 INCREMENTAL_PATH = f"{LANDING_PATH}/incremental"
@@ -95,12 +100,12 @@ except Exception:
     has_initial = False
 
 if not has_initial:
-    # Initial load: fetch 90 days
+    # Initial load: fetch INITIAL_LOAD_DAYS from config (default: 2 years / 730 days)
     processing_mode = "initial"
     end_date = datetime.now().strftime("%Y-%m-%dT00:00:00")
-    start_date = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%dT00:00:00")
+    start_date = (datetime.now() - timedelta(days=INITIAL_LOAD_DAYS)).strftime("%Y-%m-%dT00:00:00")
     target_path = INITIAL_PATH
-    print(f"INITIAL LOAD: {start_date} to {end_date}")
+    print(f"INITIAL LOAD: {start_date} to {end_date} ({INITIAL_LOAD_DAYS} days)")
 else:
     # Incremental fetch yesterday's data
     processing_mode = "incremental"

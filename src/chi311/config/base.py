@@ -165,7 +165,7 @@ class PipelineConfig:
     """
     catalog: str = field(default_factory=lambda: os.getenv("CHI311_CATALOG", "chi311"))
     initial_load_days: int = field(
-        default_factory=lambda: _parse_int_env("INITIAL_LOAD_DAYS", "90", "PipelineConfig")
+        default_factory=lambda: _parse_int_env("INITIAL_LOAD_DAYS", "730", "PipelineConfig")
     )
     incremental_lookback_days: int = field(
         default_factory=lambda: _parse_int_env("INCREMENTAL_LOOKBACK_DAYS", "1", "PipelineConfig")

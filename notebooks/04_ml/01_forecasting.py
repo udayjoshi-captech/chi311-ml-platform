@@ -64,8 +64,8 @@ df_features["ds"] = pd.to_datetime(df_features["ds"])
 
 # COMMAND -----------
 
-# Reserve last 30 days for testing
-split_date = df_features["ds"].max() - pd.Timedelta(days=30)
+# Reserve last ~33% (243 days) for testing to maintain same proportion as before
+split_date = df_features["ds"].max() - pd.Timedelta(days=243)
 train = df_features[df_features["ds"] <= split_date].copy()
 test = df_features[df_features["ds"] > split_date].copy()
 
