@@ -75,7 +75,7 @@ An end-to-end ML platform that:
                                ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │                  SERVING & MONITORING                            │
-│  Streamlit Dashboard ← Batch Predictions ← PredictionLogger      │
+│  Databricks SQL Dashboard ← Batch Predictions ← PredictionLogger │
 │  PipelineMetrics → gold.pipeline_run_log (observability table)   │
 │  Azure Monitor alert → email on Databricks job failure           │
 └──────────────────────────────────────────────────────────────────┘
@@ -95,7 +95,7 @@ An end-to-end ML platform that:
 | **ML Tracking** | MLflow | Experiment management, model registry |
 | **Forecasting** | Prophet | Handles seasonality, holidays, missing data |
 | **Feature Store** | Custom feature engineering library | Temporal, lag, rolling features |
-| **Dashboard** | Streamlit + Plotly | Live monitoring and forecast visualisation |
+| **Dashboard** | Databricks SQL Dashboard | Native monitoring with auto-refresh and permissions |
 | **IaC** | Terraform (azurerm ~3.80) | Reproducible Azure resource provisioning |
 | **CI/CD** | GitHub Actions | Linting, unit tests, automated bundle deploy |
 | **Orchestration** | Databricks Asset Bundle (DAB) | Jobs + Lakeflow pipeline lifecycle management |
@@ -149,10 +149,10 @@ chi311-ml-platform/
 │   └── integration/
 │       └── tests_pipeline_e2e.py
 │
-├── app/
-│   ├── dashboard.py                     # Streamlit: 3-tab dashboard
-│   ├── requirements.txt
-│   └── Dockerfile
+├── dashboards/
+│   ├── queries.sql                      # SQL queries for Databricks dashboard
+│   ├── setup_dashboard.py               # Notebook for programmatic setup
+│   └── docs/databricks-dashboard-setup.md  # Manual setup guide
 │
 ├── infrastructure/terraform/
 │   ├── main.tf                          # All Azure resources + Monitor alert
@@ -316,13 +316,22 @@ After every DQ notebook run, Great Expectations results (evaluated / passed / fa
 
 A scheduled query rule polls Log Analytics every 15 minutes for `DatabricksJobs runFailed` events and sends an email to `alert_email` on any failure. Provisioned automatically by Terraform.
 
-### 5. Streamlit Dashboard — three tabs
+### 5. Databricks SQL Dashboard — three tabs
 
 | Tab | Contents |
 |---|---|
-| 📊 Service Requests | KPI cards, daily volume trend chart |
-| 🔮 Forecast & Anomalies | 7-day forecast with confidence bands, anomaly detection table |
-| 🔍 Monitoring & Observability | Pipeline health KPIs, colour-coded run history, row-count bar chart, prediction log viewer, DQ pass-rate trend vs 95% threshold |
+| 📊 Overview | KPI cards (total requests, avg daily, MAPE), daily volume trends, day-of-week patterns, recent pipeline runs |
+| 🔮 Forecasts | 7-day forecast with confidence intervals, prediction vs actual scatter plot, model MAPE trends over time |
+| 🔍 Monitoring | Data quality metrics, pipeline health status, anomaly detection results, drift monitoring, task duration trends |
+
+**Setup:** See `docs/databricks-dashboard-setup.md` for manual setup or run `dashboards/setup_dashboard.py` for automated creation.
+
+**Benefits over Streamlit:**
+- ✅ No separate deployment infrastructure
+- ✅ Native Unity Catalog permissions
+- ✅ Auto-refresh scheduling built-in  
+- ✅ Lower cost (uses shared SQL Warehouse)
+- ✅ Email/Slack subscriptions included
 
 ---
 
