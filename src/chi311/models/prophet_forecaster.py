@@ -119,7 +119,7 @@ class Chi311Forecaster:
         # Validate minimum data points
         if len(pdf) < MIN_TRAINING_POINTS:
             raise ValueError(
-                f"Insufficient data: {len(pdf)} rows, need at least"
+                f"Insufficient data: {len(pdf)} rows, need at least "
                 f"{MIN_TRAINING_POINTS}. Run more ingestion batches first"
             )
 

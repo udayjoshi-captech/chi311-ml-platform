@@ -113,20 +113,24 @@ class Chi311APIClient:
                 else:
                     raise
             except requests.exceptions.RequestException as e:
-                logger.warning(
-                    "Attempt %d/%d failed: %s. Retrying in %d seconds...",
-                    attempt + 1,
-                    self.config.max_retries,
-                    e,
-                    int(self.config.retry_delay * (2**attempt)) if attempt < self.config.max_retries - 1 else 0
-                )
                 if attempt < self.config.max_retries - 1:
                     wait = self.config.retry_delay * (2**attempt)
+                    logger.warning(
+                        "Attempt %d/%d failed: %s. Retrying in %.1f seconds...",
+                        attempt + 1,
+                        self.config.max_retries,
+                        e,
+                        wait
+                    )
                     time.sleep(wait)
                 else:
+                    logger.error(
+                        "Attempt %d/%d failed: %s. All retries exhausted.",
+                        attempt + 1,
+                        self.config.max_retries,
+                        e
+                    )
                     raise
-
-        return []
 
     def fetch_all(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Fetch all records for a date range with pagination"""

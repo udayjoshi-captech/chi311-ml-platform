@@ -149,7 +149,7 @@ class TrainingConfig:
         if self.min_training_points < 1:
             raise ValueError("min_training_points must be >= 1")
         if not 0 < self.validation_split < 1:
-            raise ValueError("validation_split must be between 0 and 1")
+            raise ValueError("validation_split must be between 0 and 1 (exclusive)")
 
 
 @dataclass

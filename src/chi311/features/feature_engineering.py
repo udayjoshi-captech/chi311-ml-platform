@@ -97,8 +97,23 @@ def add_lag_features(
 
 def add_rolling_features(df: pd.DataFrame, windows: list = None) -> pd.DataFrame:
     """Add rolling mean and std features"""
+    if df.empty:
+        raise ValueError("Cannot add rolling features to empty DataFrame")
+    if "y" not in df.columns:
+        raise ValueError(f"Missing required column: 'y'. Available columns: {list(df.columns)}")
+    if not pd.api.types.is_numeric_dtype(df["y"]):
+        raise TypeError(f"Column 'y' must be numeric type, got {df['y'].dtype}")
+
     if windows is None:
         windows = [7, 14, 30]
+
+    # Validate windows
+    for w in windows:
+        if not isinstance(w, int):
+            raise TypeError(f"Window must be integer, got {type(w).__name__} for value {w}")
+        if w <= 0:
+            raise ValueError(f"Window must be positive, got {w}")
+
     df = df.copy()
     for w in windows:
         df[f"rolling_mean_{w}d"] = df["y"].rolling(w, min_periods=1).mean()
