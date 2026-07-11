@@ -197,7 +197,6 @@ targets:
               - ujoshi@captechconsulting.com
             on_failure:
               - ujoshi@captechconsulting.com
-            on_start: false
             no_alert_for_skipped_runs: false
 
           tasks:
