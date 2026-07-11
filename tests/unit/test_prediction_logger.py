@@ -155,7 +155,7 @@ class TestLogPredictions:
         # Should have called execute twice (1 failure + 1 success)
         assert mock_delta.execute.call_count == 2
         # Should have slept once
-        mock_time.sleep.assert_called_once()
+        mock_sleep.assert_called_once()
 
 
 class TestCheckDrift:

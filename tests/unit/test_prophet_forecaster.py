@@ -5,7 +5,7 @@ import numpy as np
 from unittest.mock import patch, MagicMock
 from datetime import timedelta
 
-from chi311.models.prophet_forecaster import Chi311Forecaster, MIN_TRAINING_POINTS
+from chi311.models.prophet_forecaster import Chi311Forecaster
 
 
 @pytest.fixture
@@ -209,14 +209,14 @@ class TestTrain:
         # Setup mock run context
         mock_run = MagicMock()
         mock_run.info.run_id = "test_run_123"
-        mock_mlflow.start_run.return_value.__enter__.return_value = mock_run
+        mock_start_run.return_value.__enter__.return_value = mock_run
 
         forecaster.train(sample_training_data, log_to_mlflow=True)
 
-        mock_mlflow.set_experiment.assert_called_once()
-        mock_mlflow.start_run.assert_called_once()
-        mock_mlflow.log_params.assert_called_once()
-        mock_mlflow.log_metrics.assert_called_once()
+        mock_set_experiment.assert_called_once()
+        mock_start_run.assert_called_once()
+        mock_log_params.assert_called_once()
+        mock_log_metrics.assert_called_once()
 
 
 class TestPredict:
