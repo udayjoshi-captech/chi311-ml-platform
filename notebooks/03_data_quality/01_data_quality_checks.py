@@ -104,7 +104,7 @@ bronze_expectations = [
      {"type": "expect_table_row_count_to_be_between", "kwargs": {"min_value": 1000, "max_value": 5000000}},
 ]
 
-for exp in expectations:
+for exp in bronze_expectations:
     bronze_suite.add_expectation(
         gx.expectations.registry.get_expectation_impl(exp["type"])(**exp["kwargs"])
     )

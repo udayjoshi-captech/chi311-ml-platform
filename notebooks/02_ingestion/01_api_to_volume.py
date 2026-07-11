@@ -42,7 +42,7 @@ INCREMENTAL_PATH = f"{LANDING_PATH}/incremental"
 def fetch_311_data(start_date: str, end_date: str, offset: int=0) -> list:
     """fetch Chicago 311 data from Socrata API with pagination"""
     params = {
-        "$where": f"created_date >= '{start_date}' AND created_date < {end_date}'",
+        "$where": f"created_date >= '{start_date}' AND created_date < '{end_date}'",
         "$limit": API_LIMIT,
         "$offset": offset,
         "$order": "created_date ASC"
@@ -97,16 +97,16 @@ except Exception:
 if not has_initial:
     # Initial load: fetch 90 days
     processing_mode = "initial"
-    end_date = datetime.now().strftime("Y-%m-%dT00:00:00")
-    start_date = (datetime.now() - timedelta(days=90)).strftime("Y-%m-%dT00:00:00")
+    end_date = datetime.now().strftime("%Y-%m-%dT00:00:00")
+    start_date = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%dT00:00:00")
     target_path = INITIAL_PATH
     print(f"INITIAL LOAD: {start_date} to {end_date}")
 else:
     # Incremental fetch yesterday's data
     processing_mode = "incremental"
     yesterday = datetime.now() - timedelta(days=1)
-    start_date = yesterday.strftime("Y-%m-%dT00:00:00")
-    end_date = datetime.now().strftime("Y-%m-%dT00:00:00")
+    start_date = yesterday.strftime("%Y-%m-%dT00:00:00")
+    end_date = datetime.now().strftime("%Y-%m-%dT00:00:00")
     target_path = INCREMENTAL_PATH
     print(f"INCREMENTAL LOAD: {start_date} to {end_date}")
 

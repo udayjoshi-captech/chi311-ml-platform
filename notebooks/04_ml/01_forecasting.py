@@ -65,7 +65,7 @@ df_features["ds"] = pd.to_datetime(df_features["ds"])
 # COMMAND -----------
 
 # Reserve last 30 days for testing
-split_date = pdf["ds"].max() = pd.Timedelta(days=30)
+split_date = pdf["ds"].max() - pd.Timedelta(days=30)
 train = pdf[pdf["ds"] <= split_date].copy()
 test = pdf[pdf["ds"] > split_date].copy()
 
@@ -80,7 +80,7 @@ print(f"Testing: {len(test)} days ({test['ds'].min()} to {test['ds'].max()})")
 # COMMAND -----------
 
 # Set MLflow experiment
-mlflow.set_experiemtn(EXPERIMENT_NAME)
+mlflow.set_experiment(EXPERIMENT_NAME)
 
 # COMMAND -----------
 
@@ -116,11 +116,11 @@ for i, params in enumerate(param_grid):
         model.fit(train)
 
         # Predict on test set
-        future = model.name_future_dataframe(periods=len(test))
+        future = model.make_future_dataframe(periods=len(test))
         forecast = model.predict(future)
 
         # Merge with actuals
-        test_forecast = forecast[forecast["ds"].isin(test["ds"])][("ds", "yhat", "yhat_lower", "yhat_upper")]
+        test_forecast = forecast[forecast["ds"].isin(test["ds"])][["ds", "yhat", "yhat_lower", "yhat_upper"]]
         test_merged = test.merge(test_forecast, on="ds")
 
         # Calculate metrics
@@ -136,7 +136,7 @@ for i, params in enumerate(param_grid):
         # Log model
         mlflow.prophet.log_model(model, "prophet_model")
 
-        print(f"    Run {i+1}: MAPE={mape:.2f}%, RMSE={rmse:.1f}, MAE{mae:.1f}")
+        print(f"    Run {i+1}: MAPE={mape:.2f}%, RMSE={rmse:.1f}, MAE={mae:.1f}")
 
         if mape < best_mape:
             best_mape = mape
@@ -153,7 +153,7 @@ print(f"\n Best run: {best_run_id} (MAPE: {best_mape:.2f}%)")
 
 # Reload best model for cross-validation
 best_model_uri = f"runs:/{best_run_id}/prophet_model"
-best_model = mlflow.prophet.load_mode(best_model_uri)
+best_model = mlflow.prophet.load_model(best_model_uri)
 
 # Cross-validate
 cv_results = cross_validation(
@@ -176,7 +176,7 @@ with mlflow.start_run(run_id=best_run_id):
     model_version = mlflow.register_model(
         model_uri=best_model_uri,
         name=MODEL_NAME,
-        tags{"stage": "staging", "data_source": "chi311_gold"}
+        tags={"stage": "staging", "data_source": "chi311_gold"}
     )
     print(f" Registered model: {MODEL_NAME} v{model_version.version}")
 
@@ -192,12 +192,12 @@ future_7d = best_model.make_future_dataframe(periods=7)
 forecast_7d = best_model.predict(future_7d)
 
 # Show next 7 days
-forecast_next = forecast_7d[forecast_7d["ds"] > pdf["ds"].max{}][
+forecast_next = forecast_7d[forecast_7d["ds"] > pdf["ds"].max()][
     ["ds", "yhat", "yhat_lower", "yhat_upper"]
 ].round(0)
 
 print("7-Day Forecast:")
-display(spark.createDataFrame{forecast_next})
+display(spark.createDataFrame(forecast_next))
 
 # COMMAND -----------
 

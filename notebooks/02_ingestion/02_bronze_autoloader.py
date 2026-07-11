@@ -60,15 +60,15 @@ df_enriched = (
 # COMMAND -----------
 
 # Write to Bronze Delta Table
-write_query = {
+write_query = (
     df_enriched.writeStream
     .format("delta")
     .option("checkpointLocation", f"{CHECKPOINT_PATH}/bronze")
     .option("mergeSchema", "true")
-    .option("append")
+    .outputMode("append")
     .trigger(availableNow=True)
     .toTable(BRONZE_TABLE)
-}
+)
 
 # Wait for completion
 write_query.awaitTermination()
@@ -77,7 +77,7 @@ print(f"Bronze load complete: {BRONZE_TABLE}")
 # COMMAND -----------
 
 # MAGIC %md
-# MAFIC ## Verify
+# MAGIC ## Verify
 
 # COMMAND -----------
 
@@ -108,5 +108,5 @@ display(spark.sql(f"DESCRIBE HISTORY {BRONZE_TABLE}"))
 
 # MAGIC %md
 # MAGIC **Next Step**:
-# MAGIC - Run Lakeflow DLT Pipeline for Silver + Gold transformations
+# MAGIC - Run Lakeflow Pipeline for Silver + Gold transformations
 # MAGIC - or run `03_data_quality/01_data_quality_checks.py` for validation

@@ -3,7 +3,7 @@
 -- =========================================================================
 --
 -- Architecture:
---      Bronze (Autoloader) -> Silver (DLT + SCD2) -> Gold (DLT Aggregates)
+--      Bronze (Autoloader) -> Silver (Lakeflow + SCD2) -> Gold (Lakeflow Aggregates)
 --
 -- Note: Bronze ingestion is handled by Autoloader notebooker (02_bronze_autoloader.py)
 --       This pipeline handles Silver and Gold transformations
@@ -27,7 +27,7 @@
 --      - Ward 28: 39% of requests (info call administrative ward)
 --
 --  To run this pipeline:
---  1. Go to Workflows -> Lakeflow Declarative Pipelines
+--  1. Go to Workflows -> Lakeflow
 --  2. Create new pipeline
 --  3. Point to this file
 --  4. Set Target catalog: chi311, Target schema: silver

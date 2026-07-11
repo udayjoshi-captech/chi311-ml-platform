@@ -1,6 +1,6 @@
 # 🏙️ Chicago 311 Service Request Intelligence Platform
 
-> **A Production-Grade ML Portfolio Project** demonstrating end-to-end machine learning engineering on **Azure Databricks** with Lakeflow Declarative Pipelines, SCD Type 2, MLflow, and a full CI/CD pipeline.
+> **A Production-Grade ML Portfolio Project** demonstrating end-to-end machine learning engineering on **Azure Databricks** with Lakeflow, SCD Type 2, MLflow, and a full CI/CD pipeline.
 
 [![CI/CD Pipeline](https://github.com/udayjoshi-captech/chi311-ml-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/udayjoshi-captech/chi311-ml-platform/actions/workflows/ci.yml)
 [![Azure](https://img.shields.io/badge/Azure-Cloud-0078D4?logo=microsoftazure)](https://azure.microsoft.com)
@@ -62,7 +62,7 @@ An end-to-end ML platform that:
 ┌──────────────────────────────────────────────────────────────────┐
 │          LAKEFLOW PIPELINE (Medallion + SCD Type 2)              │
 │  Bronze (Autoloader) → Silver (SCD2 history) → Gold (aggregates) │
-│  DLT CONSTRAINT expectations on every table                      │
+│  CONSTRAINT expectations on every table                          │
 └──────────────────────────────────────────────────────────────────┘
                                │
                                ▼
@@ -88,9 +88,9 @@ An end-to-end ML platform that:
 | Layer | Technology | Purpose |
 |---|---|---|
 | **Cloud** | Microsoft Azure | Subscription-based sandbox |
-| **Compute** | Azure Databricks (Premium SKU) | Managed Spark, Lakeflow, MLflow |
+| **Compute** | Azure Databricks (Premium SKU) | Managed Spark, Unity Catalog, MLflow |
 | **Storage** | ADLS Gen2 + Delta Lake | ACID transactions, time travel, medallion architecture |
-| **ETL** | Lakeflow Declarative Pipelines (SQL) | Declarative SCD2 via `APPLY CHANGES INTO` |
+| **ETL** | Lakeflow (SQL Declarative Pipelines) | Declarative SCD2 via `APPLY CHANGES INTO` |
 | **Data Quality** | Great Expectations 0.18 | Declarative validation with persistent data docs |
 | **ML Tracking** | MLflow | Experiment management, model registry |
 | **Forecasting** | Prophet | Handles seasonality, holidays, missing data |
@@ -98,7 +98,7 @@ An end-to-end ML platform that:
 | **Dashboard** | Streamlit + Plotly | Live monitoring and forecast visualisation |
 | **IaC** | Terraform (azurerm ~3.80) | Reproducible Azure resource provisioning |
 | **CI/CD** | GitHub Actions | Linting, unit tests, automated bundle deploy |
-| **Orchestration** | Databricks Asset Bundle (DAB) | Jobs + DLT pipeline lifecycle management |
+| **Orchestration** | Databricks Asset Bundle (DAB) | Jobs + Lakeflow pipeline lifecycle management |
 | **Alerting** | Azure Monitor scheduled query rules | Email on job failure via Log Analytics |
 
 ---
@@ -129,7 +129,7 @@ chi311-ml-platform/
 │       └── 02_anomaly_detection.py      # Statistical anomaly detection
 │
 ├── pipelines/
-│   └── chi311_scd2_pipeline.sql         # Lakeflow DLT: Silver SCD2 + Gold aggregates
+│   └── chi311_scd2_pipeline.sql         # Lakeflow: Silver SCD2 + Gold aggregates
 │                                        # Includes CONSTRAINT expectations on every table
 │
 ├── src/chi311/
@@ -212,7 +212,7 @@ cd ../..
 databricks bundle deploy -t dev
 ```
 
-Creates 3 jobs and 1 Lakeflow DLT pipeline in the dev workspace.
+Creates 3 jobs and 1 Lakeflow pipeline in the dev workspace.
 
 ### 4 — Run ingestion and ML jobs
 
@@ -271,7 +271,7 @@ Code Quality → Unit Tests → Deploy to Dev → Deploy to Prod (disabled)
 | `[DEV] Chi311 Data Quality` | On-demand | `Standard_DS3_v2`, single-node, spot |
 | `[DEV] Chi311 ML Training` | Monday 8 AM (paused) | `Standard_DS3_v2`, single-node, spot |
 
-### Lakeflow DLT pipeline
+### Lakeflow pipeline
 
 | Setting | Value |
 |---|---|
@@ -332,7 +332,7 @@ A scheduled query rule polls Log Analytics every 15 minutes for `DatabricksJobs 
 |---|---|
 | **Structured logging** | `logging.getLogger(__name__)` in all modules; row counts logged at each stage |
 | **Idempotent writes** | Delta MERGE on natural keys — safe to rerun without duplicates |
-| **Schema enforcement** | DLT `CONSTRAINT` on silver/gold (`ON VIOLATION DROP ROW` or `WARN`) |
+| **Schema enforcement** | Lakeflow `CONSTRAINT` on silver/gold (`ON VIOLATION DROP ROW` or `WARN`) |
 | **Empty dataset guards** | `PipelineMetrics.assert_non_empty()` raises if any stage produces 0 rows |
 | **Retry with backoff** | `Chi311APIClient` retries with exponential backoff; raises after exhausting retries |
 | **No hardcoded config** | Catalog names, workspace URLs, tokens all from environment variables or secrets |
@@ -377,10 +377,10 @@ Single-node spot clusters cut per-run compute cost by ~80% vs the original two-n
 |---|---|---|
 | **Problem Framing** | 311 demand forecasting & anomaly detection | ✅ |
 | **Data Sourcing** | Chicago 311 API (Socrata) with paginated incremental loads | ✅ |
-| **Data Quality** | Great Expectations at Bronze/Silver + DLT constraints at Silver/Gold | ✅ |
+| **Data Quality** | Great Expectations at Bronze/Silver + Lakeflow constraints at Silver/Gold | ✅ |
 | **Feature Engineering** | Temporal, lag, rolling features with row-count logging | ✅ |
 | **Model Development** | Prophet + MLflow experiment tracking | ✅ |
-| **Deployment** | Databricks Asset Bundle (3 jobs + 1 DLT pipeline) deployed via CI | ✅ |
+| **Deployment** | Databricks Asset Bundle (3 jobs + 1 Lakeflow pipeline) deployed via CI | ✅ |
 | **Monitoring** | PipelineMetrics, PredictionLogger, DQ checkpoints, Azure Monitor alerts | ✅ |
 | **CI/CD** | GitHub Actions: lint → unit tests → deploy-dev | ✅ |
 | **IaC** | All Azure resources managed by Terraform, idempotent plan | ✅ |

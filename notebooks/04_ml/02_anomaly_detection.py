@@ -40,7 +40,7 @@ FORECAST_RESIDUAL_THRESHOLD = 2.0 # 2 standard deviations of residuals
 df_gold = spark.read.table(GOLD_TABLE)
 pdf = df_gold.select("ds", "y").orderBy("ds").toPandas()
 pdf["ds"] = pd.to_datetime(pdf["ds"])
-print(f"Records: {len(pdf):.}")
+print(f"Records: {len(pdf)}")
 print(f"Mean daily requests: {pdf['y'].mean():.0f}")
 print(f"Std: {pdf['y'].std():.0f}")
 
@@ -71,7 +71,7 @@ try:
         pdf_forecast["residual"].abs() > FORECAST_RESIDUAL_THRESHOLD * residual_std
     )
 
-    forecast_anomalies = pdf_forecast[pdf_forecast]["forecast_anomaly"]
+    forecast_anomalies = pdf_forecast[pdf_forecast["forecast_anomaly"]]
     print(f"Forecast-based anomalies: {len(forecast_anomalies)}")
 
 except Exception as e:
@@ -91,7 +91,7 @@ except Exception as e:
 # Rolling 30-day Z-score
 pdf["rolling_mean_30d"] = pdf["y"].rolling(30, min_periods=7).mean()
 pdf["rolling_std_30d"] = pdf["y"].rolling(30, min_periods=7).std()
-pdf["z_score"] = (pdf["y"] - pdf["rolling_mean_30d"]) / pdf("rolling_std_30d")
+pdf["z_score"] = (pdf["y"] - pdf["rolling_mean_30d"]) / pdf["rolling_std_30d"]
 pdf["zscore_anomaly"] = pdf["z_score"].abs() > Z_SCORE_THRESHOLD
 
 zscore_anomalies = pdf[pdf["zscore_anomaly"]].dropna()
@@ -104,6 +104,8 @@ print(f"Z-score anomalies: {len(zscore_anomalies)}")
 
 # COMMAND -----------
 
+# Calculate day-over-day change
+pdf["dod_change"] = pdf["y"].diff()
 pdf["prev_day_y"] = pdf["y"].shift(1)
 pdf["dod_anomaly"] = pdf["dod_change"].abs() > DAY_OVER_DAY_THRESHOLD
 
@@ -124,7 +126,7 @@ if "forecast_anomaly" in pdf_forecast.columns:
     df_combined = df_combined.merge(
         pdf_forecast[["ds", "forecast_anomaly"]], on="ds", how="left"
     )
-    df_combined["forest_anomaly"] = df_combined["forecast_anomaly"].fillna(False)
+    df_combined["forecast_anomaly"] = df_combined["forecast_anomaly"].fillna(False)
 else:
     df_combined["forecast_anomaly"] = False
 
