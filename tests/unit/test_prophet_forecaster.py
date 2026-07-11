@@ -2,8 +2,8 @@
 import pytest
 import pandas as pd
 import numpy as np
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime, timedelta
+from unittest.mock import patch, MagicMock
+from datetime import timedelta
 
 from chi311.models.prophet_forecaster import Chi311Forecaster, MIN_TRAINING_POINTS
 

@@ -1,5 +1,5 @@
 """Production environment configuration."""
-from .base import APIConfig, ProphetConfig, MLflowConfig, TrainingConfig, PipelineConfig
+from .base import APIConfig, TrainingConfig, PipelineConfig
 
 
 # Production configurations with stricter settings

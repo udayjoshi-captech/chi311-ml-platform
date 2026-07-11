@@ -1,7 +1,7 @@
 """Tests for pipeline metrics module."""
 import pytest
 import time
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 from datetime import datetime
 
 from chi311.monitoring.pipeline_metrics import PipelineMetrics

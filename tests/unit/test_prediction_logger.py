@@ -1,9 +1,7 @@
 """Tests for prediction logger module."""
 import pytest
 import pandas as pd
-import numpy as np
-from unittest.mock import Mock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 from chi311.monitoring.prediction_logger import PredictionLogger
 

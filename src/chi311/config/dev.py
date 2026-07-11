@@ -1,5 +1,5 @@
 """Development environment configuration."""
-from .base import APIConfig, ProphetConfig, MLflowConfig, TrainingConfig, PipelineConfig
+from .base import APIConfig, TrainingConfig, PipelineConfig
 
 
 # Override defaults for development

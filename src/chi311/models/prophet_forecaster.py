@@ -4,7 +4,6 @@ Prophet model wrapper with MLflow integration.
 
 import logging
 
-import mlflow
 from prophet import Prophet
 import pandas as pd
 import numpy as np
