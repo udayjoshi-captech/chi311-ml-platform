@@ -5,22 +5,11 @@ Chicago 311 API Client - Robust Socrata API client with pagination and retry.
 import requests
 import time
 import logging
-from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 
+from chi311.config import APIConfig
+
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class APIConfig:
-    """Configuration for Chicago 311 Socrata API."""
-
-    base_url: str = "https://data.cityofchicago.org/resource/v6vf-nfxy.json"
-    app_token: Optional[str] = None
-    page_size: int = 50000
-    max_retries: int = 3
-    retry_delay: float = 2.0
-    timeout: int = 60
 
 
 class Chi311APIClient:
