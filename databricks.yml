@@ -41,6 +41,14 @@ targets:
         # Daily data ingestion
         daily_ingestion:
           name: "[DEV] Chi311 Daily Ingestion"
+
+          email_notifications:
+            on_success:
+              - ujoshi@captechconsulting.com
+            on_failure:
+              - ujoshi@captechconsulting.com
+            no_alert_for_skipped_runs: false
+
           job_clusters:
             - job_cluster_key: main
               new_cluster:
@@ -76,6 +84,14 @@ targets:
         # Data quality checks
         data_quality:
           name: "[DEV] Chi311 Data Quality"
+
+          email_notifications:
+            on_success:
+              - ujoshi@captechconsulting.com
+            on_failure:
+              - ujoshi@captechconsulting.com
+            no_alert_for_skipped_runs: false
+
           job_clusters:
             - job_cluster_key: main
               new_cluster:
@@ -98,6 +114,13 @@ targets:
         
         # ML training pipeline
         ml_training:
+          email_notifications:
+            on_success:
+              - ujoshi@captechconsulting.com
+            on_failure:
+              - ujoshi@captechconsulting.com
+            no_alert_for_skipped_runs: false
+
           name: "[DEV] Chi311 ML Training"
           job_clusters:
             - job_cluster_key: main
@@ -138,6 +161,14 @@ targets:
           catalog: chi311
           target: silver
           development: true
+
+          notifications:
+            - email_recipients:
+                - ujoshi@captechconsulting.com
+              alerts:
+                - on-update-success
+                - on-update-failure
+                - on-flow-failure
           clusters:
             - label: default
               num_workers: 1
@@ -160,6 +191,15 @@ targets:
         # Daily data ingestion (serverless)
         daily_ingestion:
           name: "[PROD] Chi311 Daily Ingestion"
+
+          email_notifications:
+            on_success:
+              - ujoshi@captechconsulting.com
+            on_failure:
+              - ujoshi@captechconsulting.com
+            on_start: false
+            no_alert_for_skipped_runs: false
+
           tasks:
             - task_key: api_to_volume
               notebook_task:

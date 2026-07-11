@@ -7,7 +7,7 @@ for observability across every job run.
 import logging
 import time
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,24 @@ class PipelineMetrics:
         logger.info("PipelineMetrics: started task=%s run_id=%s", task_name, run_id)
         return self
 
+    def __enter__(self) -> "PipelineMetrics":
+        """Enable use as context manager."""
+        if self._start_time is None:
+            raise RuntimeError("Call start() before using as context manager")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Auto-record failure on exception, but don't suppress it."""
+        # This gets called even if finish() was already called successfully
+        # Only record failure if we're still in an active state
+        if self._start_time is not None and exc_type is not None:
+            # An exception occurred before finish() was called
+            error_msg = f"{exc_type.__name__}: {exc_val}"
+            logger.error("PipelineMetrics: Exception in context — %s", error_msg)
+            # Note: We cannot write to Delta here because we don't have spark_session
+            # The caller must catch exceptions and call fail() explicitly if they want metrics logged
+        return False  # Don't suppress the exception
+
     def finish(
         self,
         rows_in: int,
@@ -41,7 +59,7 @@ class PipelineMetrics:
         rows_dropped: int = 0,
         status: str = "SUCCESS",
         error_message: Optional[str] = None,
-        spark_session=None,
+        spark_session: Optional[Any] = None,
     ) -> None:
         """Record task completion metrics to Delta table.
 
@@ -54,16 +72,32 @@ class PipelineMetrics:
             spark_session: Active SparkSession for Delta writes.
 
         Raises:
-            ValueError: If spark_session is not provided.
-            RuntimeError: If start() was not called before finish().
+            RuntimeError: If state is invalid or Delta write fails
         """
-        if self._start_time is None or self._task_name is None:
-            raise RuntimeError("Call start() before finish().")
+        if self._start_time is None or self._task_name is None or self._run_id is None:
+            raise RuntimeError(
+                "PipelineMetrics: finish() called without calling start() first. "
+                f"State: start_time={self._start_time}, task_name={self._task_name}, run_id={self._run_id}"
+            )
+
         if spark_session is None:
             raise ValueError("spark_session required for Delta writes.")
 
-        duration_seconds = round(time.time() - self._start_time, 2)
+        # Validate spark_session is active
+        try:
+            spark_session.catalog.currentDatabase()
+        except Exception as e:
+            raise ConnectionError(f"SparkSession is not active: {e}") from e
 
+        # Validate catalog/schema exist
+        catalog, schema, table_name = self.table.split(".")
+        if not spark_session.catalog.databaseExists(f"{catalog}.{schema}"):
+            raise ValueError(
+                f"Schema '{catalog}.{schema}' does not exist. "
+                "Run setup notebook to create monitoring tables."
+            )
+
+        duration_seconds = round(time.time() - self._start_time, 2)
         record = {
             "run_id": self._run_id,
             "task_name": self._task_name,
@@ -77,23 +111,35 @@ class PipelineMetrics:
         }
 
         logger.info(
-            "PipelineMetrics: task=%s status=%s rows_in=%d rows_out=%d "
-            "rows_dropped=%d duration=%.2fs",
-            self._task_name,
+            "PipelineMetrics: Recording %s — %s: %d in, %d out, %d dropped, %.2fs",
             status,
+            self._task_name,
             rows_in,
             rows_out,
             rows_dropped,
-            duration_seconds,
+            duration_seconds
         )
 
-        df = spark_session.createDataFrame([record])
-        df.write.format("delta").mode("append").saveAsTable(self.table)
-
-        # Reset state
-        self._start_time = None
-        self._task_name = None
-        self._run_id = None
+        write_error = None
+        try:
+            df = spark_session.createDataFrame([record])
+            df.write.format("delta").mode("append").saveAsTable(self.table)
+            logger.info("PipelineMetrics: Successfully logged to %s", self.table)
+        except Exception as e:
+            write_error = e
+            logger.error(
+                "PipelineMetrics: Failed to write metrics to %s — %s",
+                self.table,
+                str(e),
+                exc_info=True
+            )
+            raise RuntimeError(f"Metrics logging failed: {e}") from e
+        finally:
+            # Only reset state if write succeeded
+            if write_error is None:
+                self._start_time = None
+                self._task_name = None
+                self._run_id = None
 
     def fail(
         self,
