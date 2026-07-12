@@ -19,18 +19,18 @@
 
 import requests
 import json
+import os
 from datetime import datetime, timedelta
 from pyspark.sql import functions as F
-from chi311.config import PipelineConfig
 
 # API Configuration
 API_URL = "https://data.cityofchicago.org/resource/v6vf-nfxy.json"
 API_LIMIT = 50000 # Max records per request
 
-# Load config for initial load days
-config = PipelineConfig()
-CATALOG = config.catalog
-INITIAL_LOAD_DAYS = config.initial_load_days
+# Initial load window in days (default: 2 years). Override via INITIAL_LOAD_DAYS.
+# Kept as a self-contained constant so the notebook needs no packaged deps.
+INITIAL_LOAD_DAYS = int(os.getenv("INITIAL_LOAD_DAYS", "730"))
+CATALOG = os.getenv("CHI311_CATALOG", "chi311")
 
 # Volume paths
 LANDING_PATH = f"/Volumes/{CATALOG}/raw/chi311_landing"
