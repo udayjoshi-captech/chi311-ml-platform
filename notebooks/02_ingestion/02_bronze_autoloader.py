@@ -20,7 +20,10 @@ from pyspark.sql import functions as F
 # Paths
 CATALOG = "chi311"
 SOURCE_PATH = f"/Volumes/{CATALOG}/raw/chi311_landing"
-CHECKPOINT_PATH = f"/Volumes/{CATALOG}/bronze/chi311_landing/autoloader"
+# Checkpoint volume is 'chi311_checkpoint' (created by the setup notebook),
+# not 'chi311_landing' — the latter is a raw schema volume and does not exist
+# under the bronze schema.
+CHECKPOINT_PATH = f"/Volumes/{CATALOG}/bronze/chi311_checkpoint/autoloader"
 BRONZE_TABLE = f"{CATALOG}.bronze.bronze_raw_311_requests"
 
 # COMMAND -----------
