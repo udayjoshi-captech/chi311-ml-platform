@@ -78,10 +78,13 @@ def fetch_and_save_pages(start_date: str, end_date: str, path: str,
         if not batch:
             break
 
-        # Write this page to its own file, then let it be garbage collected
+        # Write this page to its own file, then let it be garbage collected.
+        # Use native Python file I/O against the /Volumes FUSE path — dbutils.fs.put
+        # fails on UC Volumes with "No Unity API token found in Unity Scope".
         filename = f"chi311_{mode}_{run_ts}_p{page:04d}.json"
         filepath = f"{path}/{filename}"
-        dbutils.fs.put(filepath, json.dumps(batch, indent=None), overwrite=True)
+        with open(filepath, "w") as f:
+            json.dump(batch, f)
 
         total += len(batch)
         print(f"  Page {page}: wrote {len(batch)} records to {filename} (total: {total:,})")
@@ -124,6 +127,9 @@ else:
     print(f"INCREMENTAL LOAD: {start_date} to {end_date}")
 
 # COMMAND -----------
+
+# Ensure the target directory exists (native open() won't create it)
+os.makedirs(target_path, exist_ok=True)
 
 # Fetch and save data page-by-page (constant memory — safe for multi-year loads)
 run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
