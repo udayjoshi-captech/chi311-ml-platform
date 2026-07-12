@@ -103,10 +103,14 @@ def fetch_and_save_pages(start_date: str, end_date: str, path: str,
 
 # COMMAND -----------
 
-# Determine mode: initial vs incremental
+# Determine mode: initial vs incremental.
+# Use native os on the /Volumes FUSE path — all dbutils.fs operations fail on
+# this cluster with "No Unity API token found in Unity Scope"; native file I/O
+# authenticates to UC transparently.
 try:
-    existing_files = dbutils.fs.ls(INITIAL_PATH)
-    has_initial = any(f.name.endswith(".json") for f in existing_files)
+    has_initial = os.path.isdir(INITIAL_PATH) and any(
+        name.endswith(".json") for name in os.listdir(INITIAL_PATH)
+    )
 except Exception:
     has_initial = False
 
@@ -129,9 +133,14 @@ else:
 # COMMAND -----------
 
 # Ensure the target subdirectory exists (native open() won't create it).
-# Use dbutils.fs.mkdirs — it is UC-aware and only creates dirs inside the
-# existing volume (os.makedirs fails trying to create the catalog root).
-dbutils.fs.mkdirs(target_path)
+# The volume root (LANDING_PATH) always exists, so create ONLY the leaf
+# initial/incremental dir with a non-recursive mkdir. os.makedirs is avoided
+# because on the FUSE mount it can recurse up to /Volumes/chi311 (not
+# permitted). dbutils.fs.mkdirs is avoided due to the UC token issue.
+try:
+    os.mkdir(target_path)
+except FileExistsError:
+    pass  # already created on a prior run
 
 # Fetch and save data page-by-page (constant memory — safe for multi-year loads)
 run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -150,11 +159,11 @@ if total_records == 0:
 
 # COMMAND -----------
 
-# List files in landing zone
+# List files in landing zone (native os — dbutils.fs fails with UC token error)
 print(f"\nFiles in {target_path}:")
-for f in dbutils.fs.ls(target_path):
-    size_mb = f.size / (1024 * 1024)
-    print(f"  {f.name} ({size_mb: .2f} MB)")
+for name in sorted(os.listdir(target_path)):
+    size_mb = os.path.getsize(f"{target_path}/{name}") / (1024 * 1024)
+    print(f"  {name} ({size_mb:.2f} MB)")
 
 # COMMAND -----------
 
