@@ -57,33 +57,41 @@ def fetch_311_data(start_date: str, end_date: str, offset: int=0) -> list:
     response.raise_for_status()
     return response.json()
 
-def fetch_all_pages(start_date: str, end_date: str) -> list:
-    """Fetch all pages of data for a date range"""
-    all_records = []
+def fetch_and_save_pages(start_date: str, end_date: str, path: str,
+                         mode: str, run_ts: str) -> int:
+    """Fetch all pages and write each page to its own JSON file.
+
+    Streaming approach: each 50k-record page is written to the Volume
+    immediately and then released, so driver memory stays constant
+    regardless of total record count (avoids OOM on multi-year loads).
+    Autoloader / Bronze reads every JSON file in the directory, so
+    splitting across page files is fully compatible downstream.
+
+    Returns the total number of records fetched and written.
+    """
     offset = 0
+    page = 0
+    total = 0
 
     while True:
         batch = fetch_311_data(start_date, end_date, offset)
         if not batch:
             break
-        all_records.extend(batch)
-        print(f"  Fetched {len(batch)} records (total: {len(all_records)})")
 
+        # Write this page to its own file, then let it be garbage collected
+        filename = f"chi311_{mode}_{run_ts}_p{page:04d}.json"
+        filepath = f"{path}/{filename}"
+        dbutils.fs.put(filepath, json.dumps(batch, indent=None), overwrite=True)
+
+        total += len(batch)
+        print(f"  Page {page}: wrote {len(batch)} records to {filename} (total: {total:,})")
+
+        page += 1
         if len(batch) < API_LIMIT:
             break
         offset += API_LIMIT
 
-    return all_records
-
-def save_to_volume(records: list, path:str, filename: str) -> str:
-    """Save records as JSON file in Databricks Volume."""
-    filepath = f"{path}/{filename}"
-
-    # Write JSON to dbutils
-    json_str = json.dumps(records, indent=None)
-    dbutils.fs.put(filepath, json_str, overwrite=True)
-
-    print(f"Saved {len(records):,} records to {filepath}")
+    return total
 
 # COMMAND -----------
 
@@ -117,18 +125,14 @@ else:
 
 # COMMAND -----------
 
-# Fetch data
-records = fetch_all_pages(start_date, end_date)
-print(f"\nTotal records fetched: {len(records):,}")
+# Fetch and save data page-by-page (constant memory — safe for multi-year loads)
+run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+total_records = fetch_and_save_pages(
+    start_date, end_date, target_path, processing_mode, run_ts
+)
+print(f"\nTotal records fetched and written: {total_records:,}")
 
-# COMMAND -----------
-
-# Save to Volume
-if records:
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"chi311_{processing_mode}_{timestamp}.json"
-    save_to_volume(records, target_path, filename)
-else:
+if total_records == 0:
     print("No records fetched for the date range")
 
 # COMMAND -----------
