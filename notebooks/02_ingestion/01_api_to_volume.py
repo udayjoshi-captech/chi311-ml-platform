@@ -32,10 +32,12 @@ API_LIMIT = 50000 # Max records per request
 INITIAL_LOAD_DAYS = int(os.getenv("INITIAL_LOAD_DAYS", "730"))
 CATALOG = os.getenv("CHI311_CATALOG", "chi311")
 
-# Volume paths
+# Volume paths.
+# Write JSON page files directly to the volume ROOT — the Bronze autoloader
+# reads from LANDING_PATH itself, and creating subdirectories inside the volume
+# is not permitted on this cluster. The processing mode is encoded in each
+# filename (chi311_<mode>_<ts>_p####.json) instead of using subfolders.
 LANDING_PATH = f"/Volumes/{CATALOG}/raw/chi311_landing"
-INITIAL_PATH = f"{LANDING_PATH}/initial"
-INCREMENTAL_PATH = f"{LANDING_PATH}/incremental"
 
 # COMMAND -----------
 
@@ -103,13 +105,13 @@ def fetch_and_save_pages(start_date: str, end_date: str, path: str,
 
 # COMMAND -----------
 
-# Determine mode: initial vs incremental.
-# Use native os on the /Volumes FUSE path — all dbutils.fs operations fail on
-# this cluster with "No Unity API token found in Unity Scope"; native file I/O
-# authenticates to UC transparently.
+# Determine mode: initial vs incremental. All files live directly in the
+# volume root; mode is encoded in the filename. Native os on the /Volumes FUSE
+# path — dbutils.fs fails on this cluster with "No Unity API token in Unity Scope".
 try:
-    has_initial = os.path.isdir(INITIAL_PATH) and any(
-        name.endswith(".json") for name in os.listdir(INITIAL_PATH)
+    has_initial = any(
+        name.startswith("chi311_initial_") and name.endswith(".json")
+        for name in os.listdir(LANDING_PATH)
     )
 except Exception:
     has_initial = False
@@ -119,7 +121,6 @@ if not has_initial:
     processing_mode = "initial"
     end_date = datetime.now().strftime("%Y-%m-%dT00:00:00")
     start_date = (datetime.now() - timedelta(days=INITIAL_LOAD_DAYS)).strftime("%Y-%m-%dT00:00:00")
-    target_path = INITIAL_PATH
     print(f"INITIAL LOAD: {start_date} to {end_date} ({INITIAL_LOAD_DAYS} days)")
 else:
     # Incremental fetch yesterday's data
@@ -127,20 +128,12 @@ else:
     yesterday = datetime.now() - timedelta(days=1)
     start_date = yesterday.strftime("%Y-%m-%dT00:00:00")
     end_date = datetime.now().strftime("%Y-%m-%dT00:00:00")
-    target_path = INCREMENTAL_PATH
     print(f"INCREMENTAL LOAD: {start_date} to {end_date}")
 
-# COMMAND -----------
+# All page files are written to the volume root (no subdirectories).
+target_path = LANDING_PATH
 
-# Ensure the target subdirectory exists (native open() won't create it).
-# The volume root (LANDING_PATH) always exists, so create ONLY the leaf
-# initial/incremental dir with a non-recursive mkdir. os.makedirs is avoided
-# because on the FUSE mount it can recurse up to /Volumes/chi311 (not
-# permitted). dbutils.fs.mkdirs is avoided due to the UC token issue.
-try:
-    os.mkdir(target_path)
-except FileExistsError:
-    pass  # already created on a prior run
+# COMMAND -----------
 
 # Fetch and save data page-by-page (constant memory — safe for multi-year loads)
 run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
