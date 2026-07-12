@@ -128,8 +128,10 @@ else:
 
 # COMMAND -----------
 
-# Ensure the target directory exists (native open() won't create it)
-os.makedirs(target_path, exist_ok=True)
+# Ensure the target subdirectory exists (native open() won't create it).
+# Use dbutils.fs.mkdirs — it is UC-aware and only creates dirs inside the
+# existing volume (os.makedirs fails trying to create the catalog root).
+dbutils.fs.mkdirs(target_path)
 
 # Fetch and save data page-by-page (constant memory — safe for multi-year loads)
 run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
