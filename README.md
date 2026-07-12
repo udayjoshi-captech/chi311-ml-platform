@@ -37,11 +37,12 @@ Chicago's 311 service handles ~3,000 non-emergency service requests daily. Opera
 ### Solution
 
 An end-to-end ML platform that:
-- **Forecasts** 7-day service request volumes for staffing optimisation
+- **Forecasts** 7-day service request volumes for staffing optimisation, trained on 2 years of history (≈67/33 train-test split)
 - **Detects anomalies** using statistical thresholds (mean + 2σ)
 - **Tracks request lifecycles** via SCD Type 2 for time-in-status analytics
 - **Validates data quality** at every pipeline stage with Great Expectations
 - **Monitors pipeline health** with per-task row counts, duration, and drift detection
+- **Visualizes everything** in a native Databricks SQL dashboard (no separate app to host)
 
 ### Architecture Overview
 
@@ -133,26 +134,38 @@ chi311-ml-platform/
 │                                        # Includes CONSTRAINT expectations on every table
 │
 ├── src/chi311/
+│   ├── config/
+│   │   ├── base.py                      # Dataclass configs (API, Prophet, MLflow, pipeline)
+│   │   ├── dev.py                       # Development overrides
+│   │   └── prod.py                      # Production overrides
 │   ├── ingestion/
 │   │   └── api_client.py                # Paginated Socrata client with retry + logging
 │   ├── features/
-│   │   └── feature_engineering.py       # Temporal, lag, rolling features with logging
+│   │   └── feature_engineering.py       # Temporal, lag, rolling features with validation
 │   ├── models/
 │   │   └── prophet_forecaster.py        # Prophet wrapper: prepare_data, train, predict
-│   └── monitoring/
-│       ├── prediction_logger.py         # Delta MERGE upsert + drift detection
-│       └── pipeline_metrics.py          # Per-task row counts + duration logging
+│   ├── monitoring/
+│   │   ├── prediction_logger.py         # Delta MERGE upsert + drift detection
+│   │   └── pipeline_metrics.py          # Per-task row counts + duration logging
+│   └── utils/
+│       ├── retry.py                     # Exponential-backoff retry decorator
+│       ├── paths.py                     # Centralized ADLS/volume path helpers
+│       └── dataframe.py                 # pandas ↔ Spark conversion helpers
 │
 ├── tests/
 │   ├── unit/
-│   │   └── test_feature_engineering.py  # 7 tests — all passing in CI
-│   └── integration/
-│       └── tests_pipeline_e2e.py
+│   │   ├── test_api_client.py           # API client: fetch, pagination, retry, health
+│   │   ├── test_feature_engineering.py  # Temporal/lag/rolling feature validation
+│   │   ├── test_pipeline_metrics.py     # Metrics lifecycle + assert_non_empty
+│   │   ├── test_prediction_logger.py    # Delta MERGE, drift detection
+│   │   └── test_prophet_forecaster.py   # prepare_data, train, predict, MLflow
+│   ├── integration/
+│   │   └── tests_pipeline_e2e.py
+│   └── conftest.py                      # Shared fixtures (82 tests, 77% coverage)
 │
 ├── dashboards/
-│   ├── queries.sql                      # SQL queries for Databricks dashboard
-│   ├── setup_dashboard.py               # Notebook for programmatic setup
-│   └── docs/databricks-dashboard-setup.md  # Manual setup guide
+│   ├── queries.sql                      # 20+ SQL queries for the 3-tab dashboard
+│   └── setup_dashboard.py               # Notebook for programmatic dashboard setup
 │
 ├── infrastructure/terraform/
 │   ├── main.tf                          # All Azure resources + Monitor alert
@@ -160,8 +173,12 @@ chi311-ml-platform/
 │   ├── outputs.tf
 │   └── terraform.tfvars                 # (gitignored) secrets + workspace IDs
 │
+├── docs/
+│   └── databricks-dashboard-setup.md    # Dashboard setup + layout guide
+│
 └── .github/workflows/
-    └── ci.yml                           # 4-stage CI/CD pipeline
+    ├── ci.yml                           # 4-stage CI/CD pipeline
+    └── auto-format.yml                  # Auto-format Python with black on push
 ```
 
 ---
@@ -222,16 +239,20 @@ databricks bundle run -t dev data_quality
 databricks bundle run -t dev ml_training
 ```
 
-### 5 — Launch dashboard locally
+### 5 — Set up the Databricks SQL Dashboard
+
+The monitoring dashboard is a **native Databricks SQL dashboard** — no separate app to host.
 
 ```bash
-cd app
-pip install -r requirements.txt
-DATABRICKS_HOST=https://adb-<id>.azuredatabricks.net \
-DATABRICKS_TOKEN=<your-pat> \
-DATABRICKS_CATALOG=workspace \
-streamlit run dashboard.py
+# Option A — automated: upload and run the setup notebook
+databricks workspace import dashboards/setup_dashboard.py /Shared/chi311_dashboard_setup
+
+# Option B — manual: follow the step-by-step UI guide
+#   see docs/databricks-dashboard-setup.md
 ```
+
+The dashboard reads directly from the Gold tables via a shared SQL Warehouse.
+See `docs/databricks-dashboard-setup.md` for layout, refresh schedules, and subscriptions.
 
 ---
 
@@ -246,9 +267,11 @@ Code Quality → Unit Tests → Deploy to Dev → Deploy to Prod (disabled)
 | Stage | What it does |
 |---|---|
 | **Code Quality** | `ruff check` + `black --check` + `mypy` (warn-only) on `src/` and `tests/` |
-| **Unit Tests** | `pytest tests/unit` with `--cov=src/chi311` coverage report |
+| **Unit Tests** | `pytest tests/unit` (82 tests, 77% coverage) with `--cov=src/chi311` report |
 | **Deploy to Dev** | `databricks bundle deploy -t dev` using environment secrets |
 | **Deploy to Prod** | Disabled (`if: false`) — enable by adding secrets to `production` environment |
+
+A companion `auto-format.yml` workflow runs `black` on push and commits any formatting fixes automatically, keeping the `black --check` stage green.
 
 ### Required GitHub environment secrets (Settings → Environments → dev)
 
@@ -344,6 +367,8 @@ A scheduled query rule polls Log Analytics every 15 minutes for `DatabricksJobs 
 | **Schema enforcement** | Lakeflow `CONSTRAINT` on silver/gold (`ON VIOLATION DROP ROW` or `WARN`) |
 | **Empty dataset guards** | `PipelineMetrics.assert_non_empty()` raises if any stage produces 0 rows |
 | **Retry with backoff** | `Chi311APIClient` retries with exponential backoff; raises after exhausting retries |
+| **Input validation** | Feature engineering and Prophet reject empty frames, missing/non-numeric columns, negative volumes |
+| **Centralized config** | `src/chi311/config/` dataclasses parse env vars with descriptive errors; dev/prod overrides |
 | **No hardcoded config** | Catalog names, workspace URLs, tokens all from environment variables or secrets |
 | **Spot pricing** | All dev clusters use `SPOT_WITH_FALLBACK_AZURE` — 60–80% cost reduction |
 | **Single-node clusters** | `num_workers: 0` with `local[*]` Spark — eliminates worker VM cost in dev |
