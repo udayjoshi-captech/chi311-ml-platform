@@ -95,7 +95,7 @@ def add_lag_features(
     return df
 
 
-def add_rolling_features(df: pd.DataFrame, windows: list = None) -> pd.DataFrame:
+def add_rolling_features(df: pd.DataFrame, windows: Optional[List[int]] = None) -> pd.DataFrame:
     """Add rolling mean and std features"""
     if df.empty:
         raise ValueError("Cannot add rolling features to empty DataFrame")

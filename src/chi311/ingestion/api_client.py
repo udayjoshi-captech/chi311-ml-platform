@@ -132,6 +132,14 @@ class Chi311APIClient:
                     )
                     raise
 
+        # Unreachable: the loop always returns on success or raises on the final
+        # attempt. Present so the function is provably non-None for the type checker
+        # and to guard against max_retries <= 0 misconfiguration.
+        raise RuntimeError(
+            f"fetch_records exhausted {self.config.max_retries} attempts without "
+            "returning or raising — check max_retries configuration."
+        )
+
     def fetch_all(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Fetch all records for a date range with pagination"""
         all_records = []
