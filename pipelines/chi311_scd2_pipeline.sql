@@ -144,10 +144,10 @@ SELECT
     owner_department,
     is_info_call,
     is_admin_ward_info_call,
-    _START_AT AS valid_from,
-    _END_AT AS valid_to
+    __START_AT AS valid_from,
+    __END_AT AS valid_to
 FROM LIVE.silver_scd2_311_requests
-WHERE _END_AT IS NULL;
+WHERE __END_AT IS NULL;
 
 -- =============================================================================
 -- GOLD LAYER: Daily Aggregates (Service Requests Only)
@@ -235,18 +235,18 @@ SELECT
     sr_type,
     status,
     ward,
-    _START_AT AS status_start,
-    _END_AT AS status_end,
+    __START_AT AS status_start,
+    __END_AT AS status_end,
 
     -- Time in this status (hours)
     CASE
-        WHEN _END_AT IS NOT NULL
-        THEN TIMESTAMPDIFF(HOUR, _START_AT, _END_AT)
-        ELSE TIMESTAMPDIFF(HOUR, _START_AT, current_timestamp())
+        WHEN __END_AT IS NOT NULL
+        THEN TIMESTAMPDIFF(HOUR, __START_AT, __END_AT)
+        ELSE TIMESTAMPDIFF(HOUR, __START_AT, current_timestamp())
     END AS hours_in_status,
 
     -- Is this the current version?
-    CASE WHEN _END_AT IS NULL THEN TRUE ELSE FALSE END AS is_current
+    CASE WHEN __END_AT IS NULL THEN TRUE ELSE FALSE END AS is_current
 
 FROM LIVE.silver_scd2_311_requests
 WHERE is_info_call = FALSE;
