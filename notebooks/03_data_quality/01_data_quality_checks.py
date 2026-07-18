@@ -16,8 +16,8 @@
 # COMMAND -----------
 
 import great_expectations as gx
-from great_expectations.core.expectations_suite import ExpectationSuite
-from great_expectations.expectations.expectation import Expectation
+from great_expectations.core.expectation_suite import ExpectationSuite
+from great_expectations.core.expectation_configuration import ExpectationConfiguration
 from pyspark.sql import functions as F
 from datetime import datetime
 
@@ -76,7 +76,7 @@ bronze_batch = bronze_ds.build_batch_request()
 # COMMAND -----------
 
 # Define Bronze expectations
-bronze_suite = ExpectationSuite(name="bronze_311_suite")
+bronze_suite = ExpectationSuite(expectation_suite_name="bronze_311_suite")
 
 # Critical field expectations
 bronze_expectations = [
@@ -106,7 +106,7 @@ bronze_expectations = [
 
 for exp in bronze_expectations:
     bronze_suite.add_expectation(
-        gx.expectations.registry.get_expectation_impl(exp["type"])(**exp["kwargs"])
+        ExpectationConfiguration(expectation_type=exp["type"], kwargs=exp["kwargs"])
     )
 
 # COMMAND -----------
@@ -134,7 +134,7 @@ if not bronze_results.success:
     print("\nFailed Expectations:")
     for result in bronze_results.results:
         if not result.success:
-            print(f"{result.expectation_config.type}: {result.expectation_config.kwargs}")
+            print(f"{result.expectation_config.expectation_type}: {result.expectation_config.kwargs}")
 
 # COMMAND -----------
 
@@ -162,7 +162,7 @@ if silver_exists:
     )
     silver_batch = silver_ds.build_batch_request()
 
-    silver_suite = ExpectationSuite(name="silver_311_suite")
+    silver_suite = ExpectationSuite(expectation_suite_name="silver_311_suite")
 
     silver_expectations = [
     # Null rate thresholds
@@ -183,7 +183,7 @@ if silver_exists:
 
     for exp in silver_expectations:
         silver_suite.add_expectation(
-            gx.expectations.registry.get_expectation_impl(exp["type"])(**exp["kwargs"])
+            ExpectationConfiguration(expectation_type=exp["type"], kwargs=exp["kwargs"])
         )
 
     silver_validator = context.get_validator(
