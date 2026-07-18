@@ -100,7 +100,10 @@ WHERE
 CREATE STREAMING TABLE silver_scd2_311_requests (
     CONSTRAINT valid_sr_number EXPECT (sr_number IS NOT NULL) ON VIOLATION DROP ROW,
     CONSTRAINT valid_created_date EXPECT (created_date IS NOT NULL) ON VIOLATION DROP ROW,
-    CONSTRAINT valid_status EXPECT (status IN ('Open', 'Completed', 'Canceled')) ON VIOLATION WARN
+    -- No ON VIOLATION clause = "warn" behavior: violations are tracked in
+    -- pipeline metrics but rows are retained. DLT only supports DROP ROW and
+    -- FAIL UPDATE as explicit actions; 'WARN' is not valid syntax.
+    CONSTRAINT valid_status EXPECT (status IN ('Open', 'Completed', 'Canceled'))
 )
 COMMENT "SCD2 Type 2 history of 311 requests - tracks all status changes over time"
 TBLPROPERTIES (
@@ -152,7 +155,8 @@ WHERE _END_AT IS NULL;
 
 CREATE LIVE TABLE gold_daily_service_request_summary (
     CONSTRAINT valid_request_date EXPECT (request_date IS NOT NULL) ON VIOLATION DROP ROW,
-    CONSTRAINT positive_request_count EXPECT (total_requests > 0) ON VIOLATION WARN
+    -- No ON VIOLATION clause = warn/track only (DLT has no 'WARN' keyword).
+    CONSTRAINT positive_request_count EXPECT (total_requests > 0)
 )
 COMMENT "Daily aggregates of 311 service requests (excluding info calls)"
 TBLPROPERTIES ("quality" = "gold")
