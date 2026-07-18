@@ -26,7 +26,9 @@ from pyspark.sql import functions as F
 
 # Configuration
 CATALOG = "chi311"
-GOLD_TABLE = f"{CATALOG}.gold.gold_citywide_daily_summary"
+# The Lakeflow pipeline produces gold_daily_service_request_summary with
+# request_date / total_requests; Prophet needs ds / y (aliased at load below).
+GOLD_TABLE = f"{CATALOG}.gold.gold_daily_service_request_summary"
 EXPERIMENT_NAME = "/Shared/chi311-forecasting"
 MODEL_NAME = "chi311_demand_forecast"
 
@@ -37,8 +39,13 @@ MODEL_NAME = "chi311_demand_forecast"
 
 # COMMAND -----------
 
-# Real Gold table (Prophet expects 'ds' and 'y' columns)
-df_gold = spark.read.table(GOLD_TABLE)
+# Real Gold table (Prophet expects 'ds' and 'y' columns).
+# Alias request_date -> ds and total_requests -> y from the daily summary.
+df_gold = (
+    spark.read.table(GOLD_TABLE)
+    .withColumnRenamed("request_date", "ds")
+    .withColumnRenamed("total_requests", "y")
+)
 print(f"Gold table records: {df_gold.count():,}")
 display(df_gold.orderBy("ds").limit(10))
 

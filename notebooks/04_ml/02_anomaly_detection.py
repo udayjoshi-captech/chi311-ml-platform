@@ -22,7 +22,9 @@ from datetime import datetime, timedelta
 
 # Configuration
 CATALOG = "chi311"
-GOLD_TABLE = f"{CATALOG}.gold.gold_citywide_daily_summary"
+# Pipeline produces gold_daily_service_request_summary (request_date/total_requests);
+# aliased to ds/y at load below.
+GOLD_TABLE = f"{CATALOG}.gold.gold_daily_service_request_summary"
 MODEL_NAME = "chi311_demand_forecast"
 
 # Anomaly thresholds (from exploration: mean + 2σ = 4,851)
@@ -37,7 +39,11 @@ FORECAST_RESIDUAL_THRESHOLD = 2.0 # 2 standard deviations of residuals
 
 # COMMAND -----------
 
-df_gold = spark.read.table(GOLD_TABLE)
+df_gold = (
+    spark.read.table(GOLD_TABLE)
+    .withColumnRenamed("request_date", "ds")
+    .withColumnRenamed("total_requests", "y")
+)
 pdf = df_gold.select("ds", "y").orderBy("ds").toPandas()
 pdf["ds"] = pd.to_datetime(pdf["ds"])
 print(f"Records: {len(pdf)}")
