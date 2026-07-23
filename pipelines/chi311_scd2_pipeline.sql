@@ -1,12 +1,18 @@
 -- =========================================================================
--- Chicago 311 Intelligence Platform - Lakeflow Pipeline with SCD Type 2
+-- Chicago 311 Intelligence Platform - Lakeflow Declarative Pipeline (SCD Type 2)
 -- =========================================================================
 --
 -- Architecture:
 --      Bronze (Autoloader) -> Silver (Lakeflow + SCD2) -> Gold (Lakeflow Aggregates)
 --
--- Note: Bronze ingestion is handled by Autoloader notebooker (02_bronze_autoloader.py)
---       This pipeline handles Silver and Gold transformations
+-- Note: Bronze ingestion is handled by Autoloader notebook (02_bronze_autoloader.py).
+--       This pipeline handles Silver and Gold transformations.
+--
+-- Syntax: Modern Lakeflow Declarative Pipelines (formerly "Delta Live Tables"/DLT).
+--   - Streaming tables: CREATE OR REFRESH STREAMING TABLE
+--   - Materialized views (batch aggregates): CREATE MATERIALIZED VIEW
+--   - Pipeline datasets are referenced by name (no legacy LIVE. prefix).
+--   All pipeline objects materialize as managed Delta tables in Unity Catalog.
 --
 -- Cloud: Azure Databricks
 -- Storage: ADLS Gen 2 / Unity Catalog Volumes
@@ -19,7 +25,7 @@
 -- Chicago 311 API: https://data.cityofchicago.org/resource/v6vf-nfxy.json
 --
 -- Key Finding from Exploration:
---      - Status values: Open, Completed, Canceled 
+--      - Status values: Open, Completed, Canceled
 --      - Info calls: 40% of volume ("311 INFORMATION ONLY CALL")
 --      - Daily service requests: ~3,000 (excluding info calls)
 --      - Anomaly threshold: 4,851 (mean + 2SD)
@@ -27,7 +33,7 @@
 --      - Ward 28: 39% of requests (info call administrative ward)
 --
 --  To run this pipeline:
---  1. Go to Workflows -> Lakeflow
+--  1. Go to Workflows -> Pipelines
 --  2. Create new pipeline
 --  3. Point to this file
 --  4. Set Target catalog: chi311, Target schema: silver
@@ -38,9 +44,9 @@
 -- SILVER LAYER: Staging View (Clean + Validate)
 -- =============================================================================
 
-CREATE STREAMING LIVE VIEW silver_staged_311_requests
+CREATE STREAMING VIEW silver_staged_311_requests
 COMMENT "Staged and cleaned 311 requests for SCD2 processing"
-AS 
+AS
 SELECT
     -- Primary key
     TRIM(CAST(sr_number AS STRING)) AS sr_number,
@@ -97,12 +103,12 @@ WHERE
 -- SILVER LAYER: SCD Type 2 History Table
 -- =============================================================================
 
-CREATE STREAMING TABLE silver_scd2_311_requests (
+CREATE OR REFRESH STREAMING TABLE chi311.silver.silver_scd2_311_requests (
     CONSTRAINT valid_sr_number EXPECT (sr_number IS NOT NULL) ON VIOLATION DROP ROW,
     CONSTRAINT valid_created_date EXPECT (created_date IS NOT NULL) ON VIOLATION DROP ROW,
     -- No ON VIOLATION clause = "warn" behavior: violations are tracked in
-    -- pipeline metrics but rows are retained. DLT only supports DROP ROW and
-    -- FAIL UPDATE as explicit actions; 'WARN' is not valid syntax.
+    -- data-quality metrics but rows are retained. Lakeflow only supports
+    -- DROP ROW and FAIL UPDATE as explicit actions; 'WARN' is not valid syntax.
     CONSTRAINT valid_status EXPECT (status IN ('Open', 'Completed', 'Canceled'))
 )
 COMMENT "SCD2 Type 2 history of 311 requests - tracks all status changes over time"
@@ -111,8 +117,8 @@ TBLPROPERTIES (
     "pipelines.autoOptimize.managed" = "true"
 );
 
-APPLY CHANGES INTO LIVE.silver_scd2_311_requests
-FROM STREAM(LIVE.silver_staged_311_requests)
+APPLY CHANGES INTO chi311.silver.silver_scd2_311_requests
+FROM STREAM(silver_staged_311_requests)
 KEYS (sr_number)
 SEQUENCE BY _sequence_timestamp
 COLUMNS * EXCEPT (_sequence_timestamp, _processed_timestamp)
@@ -122,7 +128,7 @@ STORED AS SCD TYPE 2;
 -- SILVER LAYER: Current State View (latest version of each request)
 -- =============================================================================
 
-CREATE LIVE TABLE silver_current_311_requests
+CREATE MATERIALIZED VIEW chi311.silver.silver_current_311_requests
 COMMENT "Current state of all 311 requests (latest SCD2 version)"
 TBLPROPERTIES ("quality" = "silver")
 AS
@@ -146,16 +152,16 @@ SELECT
     is_admin_ward_info_call,
     __START_AT AS valid_from,
     __END_AT AS valid_to
-FROM LIVE.silver_scd2_311_requests
+FROM chi311.silver.silver_scd2_311_requests
 WHERE __END_AT IS NULL;
 
 -- =============================================================================
 -- GOLD LAYER: Daily Aggregates (Service Requests Only)
 -- =============================================================================
 
-CREATE LIVE TABLE gold_daily_service_request_summary (
+CREATE MATERIALIZED VIEW chi311.gold.gold_daily_service_request_summary (
     CONSTRAINT valid_request_date EXPECT (request_date IS NOT NULL) ON VIOLATION DROP ROW,
-    -- No ON VIOLATION clause = warn/track only (DLT has no 'WARN' keyword).
+    -- No ON VIOLATION clause = warn/track only (Lakeflow has no 'WARN' keyword).
     CONSTRAINT positive_request_count EXPECT (total_requests > 0)
 )
 COMMENT "Daily aggregates of 311 service requests (excluding info calls)"
@@ -192,7 +198,7 @@ CASE WHEN DAYOFWEEK(created_date) IN (1, 7) THEN TRUE ELSE FALSE END AS is_weeke
 MONTH(created_date) AS month_num,
 YEAR(created_date) AS year_num
 
-FROM LIVE.silver_current_311_requests
+FROM chi311.silver.silver_current_311_requests
 WHERE is_info_call = FALSE
 GROUP BY DATE(created_date), DAYOFWEEK(created_date), MONTH(created_date), YEAR(created_date);
 
@@ -200,7 +206,7 @@ GROUP BY DATE(created_date), DAYOFWEEK(created_date), MONTH(created_date), YEAR(
 -- GOLD LAYER: Request Type Daily Summary
 -- =============================================================================
 
-CREATE LIVE TABLE gold_request_type_daily_summary
+CREATE MATERIALIZED VIEW chi311.gold.gold_request_type_daily_summary
 COMMENT "Daily request counts by type (excluding info calls)"
 TBLPROPERTIES ("quality" = "gold")
 AS
@@ -218,7 +224,7 @@ SELECT
         END
     ) AS avg_resolution_hours
 
-FROM LIVE.silver_current_311_requests
+FROM chi311.silver.silver_current_311_requests
 WHERE is_info_call = FALSE
 GROUP BY DATE(created_date), sr_type, sr_short_code;
 
@@ -226,7 +232,7 @@ GROUP BY DATE(created_date), sr_type, sr_short_code;
 -- GOLD LAYER: SCD2 Lifecycle Analytics
 -- =============================================================================
 
-CREATE LIVE TABLE gold_lifecycle_analytics
+CREATE MATERIALIZED VIEW chi311.gold.gold_lifecycle_analytics
 COMMENT "Time-in-status analytics from SCD2 history"
 TBLPROPERTIES ("quality" = "gold")
 AS
@@ -248,14 +254,14 @@ SELECT
     -- Is this the current version?
     CASE WHEN __END_AT IS NULL THEN TRUE ELSE FALSE END AS is_current
 
-FROM LIVE.silver_scd2_311_requests
+FROM chi311.silver.silver_scd2_311_requests
 WHERE is_info_call = FALSE;
 
 -- =============================================================================
 -- DATA QUALITY VIEWS
 -- =============================================================================
 
-CREATE LIVE VIEW dq_null_check
+CREATE MATERIALIZED VIEW dq_null_check
 COMMENT "Data quality: check for null critical fields in current requests"
 AS
 SELECT
@@ -269,10 +275,10 @@ SELECT
         (COUNT(*) - SUM(CASE WHEN sr_number IS NULL OR created_date IS NULL
          OR sr_type IS NULL OR status IS NULL THEN 1 ELSE 0 END)) / COUNT(*) * 100, 2
     ) AS completeness_pct
-FROM LIVE.silver_current_311_requests;
+FROM chi311.silver.silver_current_311_requests;
 
 
-CREATE LIVE VIEW dq_daily_volume_check
+CREATE MATERIALIZED VIEW dq_daily_volume_check
 COMMENT "Daily quality: daily volume for detecting anomalies in ingestion"
 AS
 SELECT
@@ -285,7 +291,7 @@ SELECT
         WHEN COUNT(*) < 1000 THEN 'LOW - possible missing data'
         ELSE 'NORMAL'
     END AS volume_status
-FROM LIVE.silver_current_311_requests
+FROM chi311.silver.silver_current_311_requests
 GROUP BY DATE(created_date)
 ORDER BY request_date DESC
 LIMIT 30;
