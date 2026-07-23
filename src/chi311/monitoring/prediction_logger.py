@@ -4,10 +4,10 @@ Prediction logging and drift monitoring.
 
 import logging
 import time
+from datetime import datetime, timezone
+from typing import Any
 
 import pandas as pd
-from datetime import datetime
-from typing import Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class PredictionLogger:
         self,
         predictions: pd.DataFrame,
         model_version: str,
-        spark_session: Optional[Any] = None,
+        spark_session: Any | None = None,
     ) -> None:
         """Log predictions to Delta table with idempotent upsert.
 
@@ -63,19 +63,18 @@ class PredictionLogger:
             raise ConnectionError(f"SparkSession is not active: {e}") from e
 
         predictions = predictions.copy()
-        predictions["logged_at"] = datetime.now()
+        predictions["logged_at"] = datetime.now(tz=timezone.utc)
         predictions["model_version"] = model_version
         n_rows = len(predictions)
 
         try:
             df = spark_session.createDataFrame(predictions)
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Failed to create Spark DataFrame from predictions: %s. "
                 "Schema: %s",
                 e,
                 predictions.dtypes,
-                exc_info=True
             )
             raise ValueError(f"Invalid prediction schema: {e}") from e
 
@@ -118,11 +117,10 @@ class PredictionLogger:
                         )
                         time.sleep(wait_time)
                     else:
-                        logger.error(
+                        logger.exception(
                             "Delta MERGE failed for %s: %s. Predictions will not be logged.",
                             self.table,
                             e,
-                            exc_info=True
                         )
                         raise RuntimeError(f"Prediction logging failed: {e}") from e
         else:
@@ -130,7 +128,7 @@ class PredictionLogger:
             try:
                 df.write.format("delta").mode("overwrite").saveAsTable(self.table)
             except Exception as e:
-                logger.error("Failed to create table %s: %s", self.table, e, exc_info=True)
+                logger.exception("Failed to create table %s: %s", self.table, e)
                 raise RuntimeError(f"Table creation failed: {e}") from e
 
         logger.info(
@@ -216,7 +214,7 @@ class PredictionLogger:
                 ((merged["y_actual"] - merged["y_pred"]).abs() / merged["y_actual"]).mean()
             )
         except Exception as e:
-            logger.error("check_drift: MAPE calculation failed - %s", e, exc_info=True)
+            logger.exception("check_drift: MAPE calculation failed - %s", e)
             return {
                 "drift_detected": False,
                 "message": f"MAPE calculation failed: {e}",

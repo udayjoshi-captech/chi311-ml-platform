@@ -4,10 +4,9 @@ Prophet model wrapper with MLflow integration.
 
 import logging
 
-from prophet import Prophet
-import pandas as pd
 import numpy as np
-from typing import Optional
+import pandas as pd
+from prophet import Prophet
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +30,8 @@ class Chi311Forecaster:
             "seasonality_mode": seasonality_mode,
         }
         self.experiment_name = experiment_name
-        self.model: Optional[Prophet] = None
-        self._run_id: Optional[str] = None
+        self.model: Prophet | None = None
+        self._run_id: str | None = None
 
     @staticmethod
     def prepare_data(

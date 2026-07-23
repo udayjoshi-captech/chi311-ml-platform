@@ -1,8 +1,9 @@
 """Tests for pipeline metrics module."""
-import pytest
 import time
-from unittest.mock import MagicMock, patch
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from chi311.monitoring.pipeline_metrics import PipelineMetrics
 
@@ -153,18 +154,16 @@ class TestPipelineMetrics:
         """Should raise error if used as context manager without calling start()."""
         metrics = PipelineMetrics(catalog="chi311")
 
-        with pytest.raises(RuntimeError, match="Call start\\(\\) before using as context manager"):
-            with metrics:
-                pass
+        with pytest.raises(RuntimeError, match="Call start\\(\\) before using as context manager"), metrics:
+            pass
 
     def test_context_manager_logs_exception(self, mock_spark):
         """Should log exception in __exit__ but not suppress it."""
         metrics = PipelineMetrics(catalog="chi311")
         metrics.start(task_name="test", run_id="123")
 
-        with pytest.raises(ValueError, match="Test error"):
-            with metrics:
-                raise ValueError("Test error")
+        with pytest.raises(ValueError, match="Test error"), metrics:
+            raise ValueError("Test error")
 
         # State should still be set (not reset because finish wasn't called)
         assert metrics._start_time is not None

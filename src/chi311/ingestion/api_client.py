@@ -2,10 +2,11 @@
 Chicago 311 API Client - Robust Socrata API client with pagination and retry.
 """
 
-import requests
-import time
 import logging
-from typing import Optional, List, Dict, Any
+import time
+from typing import Any
+
+import requests
 
 from chi311.config import APIConfig
 
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 class Chi311APIClient:
     """Client for Chicago 311 Open Data API."""
 
-    def __init__(self, config: Optional[APIConfig] = None):
+    def __init__(self, config: APIConfig | None = None):
         self.config = config or APIConfig()
         self.session = requests.Session()
         self._closed = False
@@ -44,7 +45,7 @@ class Chi311APIClient:
 
     def fetch_records(
         self, start_date: str, end_date: str, offset: int = 0
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Fetch a page of 311 records for a date range.
 
         Args:
@@ -140,7 +141,7 @@ class Chi311APIClient:
             "returning or raising — check max_retries configuration."
         )
 
-    def fetch_all(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    def fetch_all(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
         """Fetch all records for a date range with pagination"""
         all_records = []
         offset = 0

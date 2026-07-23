@@ -1,7 +1,8 @@
 """Tests for prediction logger module."""
-import pytest
-import pandas as pd
 from unittest.mock import MagicMock, patch
+
+import pandas as pd
+import pytest
 
 from chi311.monitoring.prediction_logger import PredictionLogger
 

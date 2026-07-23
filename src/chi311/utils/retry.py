@@ -1,8 +1,9 @@
 """Retry utilities with exponential backoff."""
-import time
 import logging
-from typing import Callable, Type, Tuple, Any
+import time
+from collections.abc import Callable
 from functools import wraps
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,7 @@ def retry_with_backoff(
     max_retries: int = 3,
     initial_delay: float = 1.0,
     backoff_multiplier: float = 2.0,
-    exceptions: Tuple[Type[Exception], ...] = (Exception,)
+    exceptions: tuple[type[Exception], ...] = (Exception,)
 ):
     """Decorator for retrying function with exponential backoff.
 

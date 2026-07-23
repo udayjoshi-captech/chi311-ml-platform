@@ -6,8 +6,8 @@ for observability across every job run.
 
 import logging
 import time
-from datetime import datetime
-from typing import Optional, Any
+from datetime import datetime, timezone
+from typing import Any, Self
 
 logger = logging.getLogger(__name__)
 
@@ -18,15 +18,15 @@ class PipelineMetrics:
     def __init__(self, catalog: str):
         self.catalog = catalog
         self.table = f"{catalog}.gold.pipeline_run_log"
-        self._start_time: Optional[float] = None
-        self._task_name: Optional[str] = None
-        self._run_id: Optional[str] = None
+        self._start_time: float | None = None
+        self._task_name: str | None = None
+        self._run_id: str | None = None
 
     # ------------------------------------------------------------------
     # Context manager interface — use with `with` blocks
     # ------------------------------------------------------------------
 
-    def start(self, task_name: str, run_id: str) -> "PipelineMetrics":
+    def start(self, task_name: str, run_id: str) -> Self:
         """Mark the start of a pipeline task."""
         self._task_name = task_name
         self._run_id = run_id
@@ -34,7 +34,7 @@ class PipelineMetrics:
         logger.info("PipelineMetrics: started task=%s run_id=%s", task_name, run_id)
         return self
 
-    def __enter__(self) -> "PipelineMetrics":
+    def __enter__(self) -> Self:
         """Enable use as context manager."""
         if self._start_time is None:
             raise RuntimeError("Call start() before using as context manager")
@@ -58,8 +58,8 @@ class PipelineMetrics:
         rows_out: int,
         rows_dropped: int = 0,
         status: str = "SUCCESS",
-        error_message: Optional[str] = None,
-        spark_session: Optional[Any] = None,
+        error_message: str | None = None,
+        spark_session: Any | None = None,
     ) -> None:
         """Record task completion metrics to Delta table.
 
@@ -90,7 +90,7 @@ class PipelineMetrics:
             raise ConnectionError(f"SparkSession is not active: {e}") from e
 
         # Validate catalog/schema exist
-        catalog, schema, table_name = self.table.split(".")
+        catalog, schema, _table_name = self.table.split(".")
         if not spark_session.catalog.databaseExists(f"{catalog}.{schema}"):
             raise ValueError(
                 f"Schema '{catalog}.{schema}' does not exist. "
@@ -107,7 +107,7 @@ class PipelineMetrics:
             "rows_dropped": rows_dropped,
             "duration_seconds": duration_seconds,
             "error_message": error_message,
-            "logged_at": datetime.now(),
+            "logged_at": datetime.now(tz=timezone.utc),
         }
 
         logger.info(
@@ -127,11 +127,10 @@ class PipelineMetrics:
             logger.info("PipelineMetrics: Successfully logged to %s", self.table)
         except Exception as e:
             write_error = e
-            logger.error(
+            logger.exception(
                 "PipelineMetrics: Failed to write metrics to %s — %s",
                 self.table,
                 str(e),
-                exc_info=True
             )
             raise RuntimeError(f"Metrics logging failed: {e}") from e
         finally:

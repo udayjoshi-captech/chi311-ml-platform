@@ -1,10 +1,12 @@
 """Unit tests for Chi311 API Client."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 import requests
-from unittest.mock import patch, MagicMock
-from chi311.ingestion.api_client import Chi311APIClient
+
 from chi311.config import APIConfig
+from chi311.ingestion.api_client import Chi311APIClient
 
 
 class TestChi311APIClient:

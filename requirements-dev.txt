@@ -2,6 +2,11 @@
 -r requirements.txt
 pytest>=7.4.0
 pytest-cov>=4.1.0
+# NOTE: ruff/black are intentionally left unpinned for now, but this caused a
+# CI break — a newer ruff release silently enabled more default rules and
+# failed Code Quality on an unrelated push. Recommend pinning both to the
+# exact version CI currently resolves (read it from the CI 'pip install' log)
+# to make Code Quality deterministic, then bump deliberately.
 ruff>=0.1.0
 black>=23.0.0
 mypy>=1.5.0

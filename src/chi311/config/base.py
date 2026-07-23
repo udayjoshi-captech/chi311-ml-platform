@@ -1,7 +1,7 @@
 """Base configuration classes for chi311 platform."""
 import os
 from dataclasses import dataclass, field
-from typing import Literal, Optional
+from typing import Literal
 
 
 def _parse_int_env(var_name: str, default: str, config_class: str) -> int:
@@ -41,7 +41,7 @@ class APIConfig:
         page_size: Number of records per API request
     """
     base_url: str = "https://data.cityofchicago.org/resource/v6vf-nfxy.json"
-    app_token: Optional[str] = field(
+    app_token: str | None = field(
         default_factory=lambda: os.getenv("CHI311_API_TOKEN")
     )
     timeout: int = field(default_factory=lambda: _parse_int_env("API_TIMEOUT", "30", "APIConfig"))

@@ -1,6 +1,6 @@
 """DataFrame conversion and validation utilities."""
 import logging
-from typing import Any, List, Optional
+from typing import Any
 
 import pandas as pd
 
@@ -29,11 +29,10 @@ def pandas_to_spark(pdf: pd.DataFrame, spark_session: Any) -> Any:
     try:
         return spark_session.createDataFrame(pdf)
     except Exception as e:
-        logger.error(
+        logger.exception(
             "Failed to convert Pandas to Spark DataFrame: %s. Schema: %s",
             e,
             pdf.dtypes,
-            exc_info=True
         )
         raise ValueError(f"DataFrame conversion failed: {e}") from e
 
@@ -55,14 +54,14 @@ def spark_to_pandas(sdf: Any) -> pd.DataFrame:
         logger.debug("Converted Spark DataFrame to Pandas: %d rows", len(pdf))
         return pdf
     except Exception as e:
-        logger.error("Failed to convert Spark to Pandas DataFrame: %s", e, exc_info=True)
+        logger.exception("Failed to convert Spark to Pandas DataFrame: %s", e)
         raise ValueError(f"DataFrame conversion failed: {e}") from e
 
 
 def validate_schema(
     df: pd.DataFrame,
-    required_columns: List[str],
-    name: Optional[str] = None
+    required_columns: list[str],
+    name: str | None = None
 ) -> None:
     """Validate DataFrame has required columns.
 

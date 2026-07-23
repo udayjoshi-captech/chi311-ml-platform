@@ -1,12 +1,13 @@
 """Unit tests for feature engineering."""
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from chi311.features.feature_engineering import (
-    add_temporal_features,
     add_lag_features,
     add_rolling_features,
+    add_temporal_features,
     prepare_features,
 )
 

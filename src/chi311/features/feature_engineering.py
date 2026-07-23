@@ -4,7 +4,6 @@ Generates temporal, lag and rolling features from Gold daily summaries.
 """
 
 import logging
-from typing import List, Optional
 
 import pandas as pd
 
@@ -52,7 +51,7 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_lag_features(
     df: pd.DataFrame,
-    lags: Optional[List[int]] = None
+    lags: list[int] | None = None
 ) -> pd.DataFrame:
     """Add lag features for time series forecasting.
 
@@ -95,7 +94,7 @@ def add_lag_features(
     return df
 
 
-def add_rolling_features(df: pd.DataFrame, windows: Optional[List[int]] = None) -> pd.DataFrame:
+def add_rolling_features(df: pd.DataFrame, windows: list[int] | None = None) -> pd.DataFrame:
     """Add rolling mean and std features"""
     if df.empty:
         raise ValueError("Cannot add rolling features to empty DataFrame")

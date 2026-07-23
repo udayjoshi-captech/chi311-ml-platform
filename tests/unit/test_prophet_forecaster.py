@@ -1,9 +1,10 @@
 """Tests for Prophet forecaster module."""
-import pytest
-import pandas as pd
-import numpy as np
-from unittest.mock import patch, MagicMock
 from datetime import timedelta
+from unittest.mock import MagicMock, patch
+
+import numpy as np
+import pandas as pd
+import pytest
 
 from chi311.models.prophet_forecaster import Chi311Forecaster
 
