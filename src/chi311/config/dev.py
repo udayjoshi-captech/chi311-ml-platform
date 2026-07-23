@@ -1,7 +1,6 @@
 """Development environment configuration."""
 from .base import APIConfig, PipelineConfig, TrainingConfig
 
-
 # Override defaults for development
 DEV_API_CONFIG = APIConfig(
     timeout=60,  # Longer timeout for debugging

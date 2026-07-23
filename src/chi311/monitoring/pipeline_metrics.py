@@ -128,9 +128,8 @@ class PipelineMetrics:
         except Exception as e:
             write_error = e
             logger.exception(
-                "PipelineMetrics: Failed to write metrics to %s — %s",
+                "PipelineMetrics: Failed to write metrics to %s",
                 self.table,
-                str(e),
             )
             raise RuntimeError(f"Metrics logging failed: {e}") from e
         finally:

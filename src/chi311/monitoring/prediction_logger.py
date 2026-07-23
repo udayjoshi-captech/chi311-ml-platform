@@ -71,9 +71,7 @@ class PredictionLogger:
             df = spark_session.createDataFrame(predictions)
         except Exception as e:
             logger.exception(
-                "Failed to create Spark DataFrame from predictions: %s. "
-                "Schema: %s",
-                e,
+                "Failed to create Spark DataFrame from predictions. Schema: %s",
                 predictions.dtypes,
             )
             raise ValueError(f"Invalid prediction schema: {e}") from e
@@ -118,9 +116,8 @@ class PredictionLogger:
                         time.sleep(wait_time)
                     else:
                         logger.exception(
-                            "Delta MERGE failed for %s: %s. Predictions will not be logged.",
+                            "Delta MERGE failed for %s. Predictions will not be logged.",
                             self.table,
-                            e,
                         )
                         raise RuntimeError(f"Prediction logging failed: {e}") from e
         else:
@@ -128,7 +125,7 @@ class PredictionLogger:
             try:
                 df.write.format("delta").mode("overwrite").saveAsTable(self.table)
             except Exception as e:
-                logger.exception("Failed to create table %s: %s", self.table, e)
+                logger.exception("Failed to create table %s", self.table)
                 raise RuntimeError(f"Table creation failed: {e}") from e
 
         logger.info(
@@ -214,7 +211,7 @@ class PredictionLogger:
                 ((merged["y_actual"] - merged["y_pred"]).abs() / merged["y_actual"]).mean()
             )
         except Exception as e:
-            logger.exception("check_drift: MAPE calculation failed - %s", e)
+            logger.exception("check_drift: MAPE calculation failed")
             return {
                 "drift_detected": False,
                 "message": f"MAPE calculation failed: {e}",

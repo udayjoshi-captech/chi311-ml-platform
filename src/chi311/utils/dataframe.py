@@ -30,8 +30,7 @@ def pandas_to_spark(pdf: pd.DataFrame, spark_session: Any) -> Any:
         return spark_session.createDataFrame(pdf)
     except Exception as e:
         logger.exception(
-            "Failed to convert Pandas to Spark DataFrame: %s. Schema: %s",
-            e,
+            "Failed to convert Pandas to Spark DataFrame. Schema: %s",
             pdf.dtypes,
         )
         raise ValueError(f"DataFrame conversion failed: {e}") from e
@@ -54,7 +53,7 @@ def spark_to_pandas(sdf: Any) -> pd.DataFrame:
         logger.debug("Converted Spark DataFrame to Pandas: %d rows", len(pdf))
         return pdf
     except Exception as e:
-        logger.exception("Failed to convert Spark to Pandas DataFrame: %s", e)
+        logger.exception("Failed to convert Spark to Pandas DataFrame")
         raise ValueError(f"DataFrame conversion failed: {e}") from e
 
 

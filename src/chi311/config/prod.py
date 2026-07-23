@@ -1,7 +1,6 @@
 """Production environment configuration."""
 from .base import APIConfig, PipelineConfig, TrainingConfig
 
-
 # Production configurations with stricter settings
 PROD_API_CONFIG = APIConfig(
     timeout=30,
