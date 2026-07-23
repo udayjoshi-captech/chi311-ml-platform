@@ -9,10 +9,14 @@
 --       This pipeline handles Silver and Gold transformations.
 --
 -- Syntax: Modern Lakeflow Declarative Pipelines (formerly "Delta Live Tables"/DLT).
---   - Streaming tables: CREATE OR REFRESH STREAMING TABLE
---   - Materialized views (batch aggregates): CREATE MATERIALIZED VIEW
+--   - Streaming tables:   CREATE OR REFRESH STREAMING TABLE
+--   - Materialized views: CREATE MATERIALIZED VIEW (persisted batch aggregates)
+--   - Transient views:    CREATE TEMPORARY VIEW (pipeline-private; not persisted).
+--       Streaming behavior of a temp view is inferred from FROM STREAM(...) in
+--       its query -- there is NO "CREATE STREAMING VIEW" statement.
 --   - Pipeline datasets are referenced by name (no legacy LIVE. prefix).
---   All pipeline objects materialize as managed Delta tables in Unity Catalog.
+--   Persisted objects (streaming tables + materialized views) land as managed
+--   Delta tables in Unity Catalog; temporary views stay pipeline-private.
 --
 -- Cloud: Azure Databricks
 -- Storage: ADLS Gen 2 / Unity Catalog Volumes
@@ -44,8 +48,8 @@
 -- SILVER LAYER: Staging View (Clean + Validate)
 -- =============================================================================
 
-CREATE STREAMING VIEW silver_staged_311_requests
-COMMENT "Staged and cleaned 311 requests for SCD2 processing"
+CREATE TEMPORARY VIEW silver_staged_311_requests
+COMMENT "Staged and cleaned 311 requests for SCD2 processing (streaming inferred from FROM STREAM(...))"
 AS
 SELECT
     -- Primary key
@@ -261,7 +265,7 @@ WHERE is_info_call = FALSE;
 -- DATA QUALITY VIEWS
 -- =============================================================================
 
-CREATE MATERIALIZED VIEW dq_null_check
+CREATE TEMPORARY VIEW dq_null_check
 COMMENT "Data quality: check for null critical fields in current requests"
 AS
 SELECT
@@ -278,7 +282,7 @@ SELECT
 FROM chi311.silver.silver_current_311_requests;
 
 
-CREATE MATERIALIZED VIEW dq_daily_volume_check
+CREATE TEMPORARY VIEW dq_daily_volume_check
 COMMENT "Daily quality: daily volume for detecting anomalies in ingestion"
 AS
 SELECT
