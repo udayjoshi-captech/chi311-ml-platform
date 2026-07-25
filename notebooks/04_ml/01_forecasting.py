@@ -100,6 +100,7 @@ param_grid = [
 
 best_mape = float("inf")
 best_run_id = None
+best_params = None
 
 for i, params in enumerate(param_grid):
     with mlflow.start_run(run_name=f"prophet_grid_{i+1}"):
@@ -148,6 +149,7 @@ for i, params in enumerate(param_grid):
         if mape < best_mape:
             best_mape = mape
             best_run_id = mlflow.active_run().info.run_id
+            best_params = params
 
 print(f"\n Best run: {best_run_id} (MAPE: {best_mape:.2f}%)")
 
@@ -176,16 +178,43 @@ display(spark.createDataFrame(cv_metrics))
 # COMMAND -----------
 
 # MAGIC %md
-# MAGIC ## 6. Registry Best Model
+# MAGIC ## 6. Refit on Full History + Register Production Model
+# MAGIC
+# MAGIC The grid-search models were fit on the training split only (to keep the
+# MAGIC test split held out for honest MAPE). The production model that generates
+# MAGIC the live 7-day forecast must be refit on the ENTIRE history using the
+# MAGIC winning hyperparameters — otherwise make_future_dataframe() extends only
+# MAGIC 7 days past the training max, which is still ~243 days behind the latest
+# MAGIC actuals, and the future-only slice comes back empty.
 
-# Register in MLflow Model Registry
-with mlflow.start_run(run_id=best_run_id):
+# COMMAND -----------
+
+# Refit the winning config on all available data
+prod_model = Prophet(
+    changepoint_prior_scale=best_params["changepoint_prior_scale"],
+    seasonality_prior_scale=best_params["seasonality_prior_scale"],
+    seasonality_mode=best_params["seasonality_mode"],
+    daily_seasonality=False,
+    weekly_seasonality=True,
+    yearly_seasonality=True
+)
+prod_model.add_country_holidays(country_name="US")
+prod_model.fit(df_features)
+
+# Register the full-history production model in MLflow Model Registry
+with mlflow.start_run(run_name="prophet_production_full_fit"):
+    mlflow.log_params(best_params)
+    mlflow.log_param("train_size", len(df_features))
+    mlflow.log_metric("selection_mape", best_mape)
+    mlflow.prophet.log_model(prod_model, "prophet_model")
+    prod_run_id = mlflow.active_run().info.run_id
+
     model_version = mlflow.register_model(
-        model_uri=best_model_uri,
+        model_uri=f"runs:/{prod_run_id}/prophet_model",
         name=MODEL_NAME,
-        tags={"stage": "staging", "data_source": "chi311_gold"}
+        tags={"stage": "staging", "data_source": "chi311_gold", "fit": "full_history"}
     )
-    print(f" Registered model: {MODEL_NAME} v{model_version.version}")
+    print(f" Registered production model: {MODEL_NAME} v{model_version.version}")
 
 # COMMAND -----------
 
@@ -194,16 +223,22 @@ with mlflow.start_run(run_id=best_run_id):
 
 # COMMAND -----------
 
-# Generate forecast
-future_7d = best_model.make_future_dataframe(periods=7)
-forecast_7d = best_model.predict(future_7d)
+# Generate forecast from the full-history production model
+future_7d = prod_model.make_future_dataframe(periods=7)
+forecast_7d = prod_model.predict(future_7d)
 
-# Show next 7 days
+# Show next 7 days (strictly future of the latest actual)
 forecast_next = forecast_7d[forecast_7d["ds"] > df_features["ds"].max()][
     ["ds", "yhat", "yhat_lower", "yhat_upper"]
 ].round(0)
 
-print("7-Day Forecast:")
+# Guard: the future slice must have exactly the horizon we asked for.
+if forecast_next.empty:
+    raise ValueError(
+        "7-day forecast is empty — the production model was not fit on full "
+        f"history (latest actual: {df_features['ds'].max()}). Check the refit step."
+    )
+print(f"7-Day Forecast ({len(forecast_next)} days):")
 display(spark.createDataFrame(forecast_next))
 
 # COMMAND -----------
