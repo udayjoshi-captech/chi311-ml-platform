@@ -76,8 +76,8 @@ An end-to-end ML platform that:
                                ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │                  SERVING & MONITORING                            │
-│  Databricks SQL Dashboard ← Batch Predictions ← PredictionLogger │
-│  PipelineMetrics → gold.pipeline_run_log (observability table)   │
+│  Databricks SQL Dashboard ← Gold tables (dq, forecasts, anomaly) │
+│  PipelineMetrics → gold.pipeline_run_log (wiring pending)        │
 │  Azure Monitor alert → email on Databricks job failure           │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -309,6 +309,12 @@ A companion `auto-format.yml` workflow runs `black` on push and commits any form
 
 ### 1. Pipeline Run Metrics — `gold.pipeline_run_log`
 
+> ⏳ **Wiring pending.** The `PipelineMetrics` class is implemented and unit-tested,
+> but not yet called from any notebook — so `gold.pipeline_run_log` is not created
+> and the dashboard widgets that read it (pipeline health, volume trend, task
+> durations, recent errors) stay commented out as deferred. Wire the snippet below
+> into each notebook task to enable them.
+
 Wrap every notebook task with `PipelineMetrics` to record row counts, duration, and status:
 
 ```python
@@ -328,6 +334,12 @@ except Exception as e:
 Columns: `run_id`, `task_name`, `status`, `rows_in`, `rows_out`, `rows_dropped`, `duration_seconds`, `error_message`, `logged_at`.
 
 ### 2. Prediction Drift Detection — `gold.gold_prediction_log`
+
+> ⏳ **Wiring pending.** `PredictionLogger` is implemented and unit-tested, but the
+> forecasting notebook currently writes predictions directly to `gold.gold_forecasts`
+> rather than calling `PredictionLogger.log_predictions()`. Until it is wired in,
+> `gold.gold_prediction_log` is not created and the MAPE-over-time dashboard widget
+> stays deferred.
 
 `PredictionLogger` upserts predictions via Delta MERGE on `(ds, model_version)` — idempotent on reruns. `check_drift()` computes MAPE against actuals and emits `logger.warning` when the threshold (default 20%) is exceeded.
 
@@ -416,7 +428,7 @@ Single-node spot clusters cut per-run compute cost by ~80% vs the original two-n
 | **Feature Engineering** | Temporal, lag, rolling features with row-count logging | ✅ |
 | **Model Development** | Prophet + MLflow experiment tracking | ✅ |
 | **Deployment** | Databricks Asset Bundle (3 jobs + 1 Lakeflow pipeline) deployed via CI | ✅ |
-| **Monitoring** | PipelineMetrics, PredictionLogger, DQ checkpoints, Azure Monitor alerts | ✅ |
+| **Monitoring** | DQ checkpoints, anomaly detection & Azure Monitor alerts active; PipelineMetrics & PredictionLogger implemented, wiring pending | 🟡 |
 | **CI/CD** | GitHub Actions: lint → unit tests → deploy-dev | ✅ |
 | **IaC** | All Azure resources managed by Terraform, idempotent plan | ✅ |
 
