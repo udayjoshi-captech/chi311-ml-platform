@@ -156,6 +156,14 @@ targets:
               job_cluster_key: main
               notebook_task:
                 notebook_path: notebooks/04_ml/01_forecasting.py
+              # Prophet is installed as a task library (before the kernel
+              # starts) rather than via notebook-scoped %pip + %restart_python,
+              # which raced intermittently and left Prophet's Stan backend
+              # uninitialized ("'Prophet' object has no attribute 'stan_backend'").
+              # 1.1.6 tightens the transitive holidays pin that drifted in 1.1.5.
+              libraries:
+                - pypi:
+                    package: prophet==1.1.6
 
             - task_key: anomaly_detection
               depends_on:
@@ -163,6 +171,11 @@ targets:
               job_cluster_key: main
               notebook_task:
                 notebook_path: notebooks/04_ml/02_anomaly_detection.py
+              # Needs prophet to deserialize the registered model via
+              # mlflow.prophet.load_model — same task library as forecasting.
+              libraries:
+                - pypi:
+                    package: prophet==1.1.6
 
           schedule:
             quartz_cron_expression: "0 0 8 ? * MON" # Monday 8AM

@@ -7,11 +7,12 @@
 # MAGIC **Pattern**: Gold Table -> Feature Engineering -> Prophet -> MLflow Tracking
 # MAGIC
 # MAGIC **Cloud**: Azure Databricks with MLflow
-
-# COMMAND -----------
-
-# MAGIC %pip install prophet==1.1.5
-# MAGIC %restart_python
+# MAGIC
+# MAGIC **Note**: `prophet==1.1.6` is installed as a task library (see
+# MAGIC `databricks.yml`), so no notebook-scoped `%pip` / `%restart_python` is
+# MAGIC needed. Installing before the kernel starts avoids the intermittent
+# MAGIC Stan-backend init failure that `%pip` + `%restart_python` caused. 1.1.6
+# MAGIC also tightens the transitive `holidays` pin (a drift source in 1.1.5).
 
 # COMMAND -----------
 
