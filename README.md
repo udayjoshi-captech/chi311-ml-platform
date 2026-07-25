@@ -38,7 +38,7 @@ Chicago's 311 service handles ~3,000 non-emergency service requests daily. Opera
 
 An end-to-end ML platform that:
 - **Forecasts** 7-day service request volumes for staffing optimisation, trained on 2 years of history (≈67/33 train-test split)
-- **Detects anomalies** using statistical thresholds (mean + 2σ)
+- **Detects anomalies** with a 3-method ensemble (Prophet residuals, rolling z-score, day-over-day) citywide, plus per-request-type detection for "what spiked" drill-down
 - **Tracks request lifecycles** via SCD Type 2 for time-in-status analytics
 - **Validates data quality** at every pipeline stage with Great Expectations
 - **Monitors pipeline health** with per-task row counts, duration, and drift detection
@@ -127,7 +127,7 @@ chi311-ml-platform/
 │   │   └── 01_data_quality_checks.py    # GE validation + checkpoint persistence
 │   └── 04_ml/
 │       ├── 01_forecasting.py            # Prophet training + MLflow tracking
-│       └── 02_anomaly_detection.py      # Statistical anomaly detection
+│       └── 02_anomaly_detection.py      # Ensemble + per-type anomaly detection
 │
 ├── pipelines/
 │   └── chi311_scd2_pipeline.sql         # Lakeflow: Silver SCD2 + Gold aggregates
@@ -164,7 +164,7 @@ chi311-ml-platform/
 │   └── conftest.py                      # Shared fixtures (82 tests, 77% coverage)
 │
 ├── dashboards/
-│   ├── queries.sql                      # 20+ SQL queries for the 3-tab dashboard
+│   ├── queries.sql                      # 25+ SQL queries for the 4-tab dashboard
 │   └── setup_dashboard.py               # Notebook for programmatic dashboard setup
 │
 ├── infrastructure/terraform/
@@ -339,13 +339,14 @@ After every DQ notebook run, Great Expectations results (evaluated / passed / fa
 
 A scheduled query rule polls Log Analytics every 15 minutes for `DatabricksJobs runFailed` events and sends an email to `alert_email` on any failure. Provisioned automatically by Terraform.
 
-### 5. Databricks SQL Dashboard — three tabs
+### 5. Databricks SQL Dashboard — four tabs
 
 | Tab | Contents |
 |---|---|
-| 📊 Overview | KPI cards (total requests, avg daily, MAPE), daily volume trends, day-of-week patterns, recent pipeline runs |
-| 🔮 Forecasts | 7-day forecast with confidence intervals, prediction vs actual scatter plot, model MAPE trends over time |
-| 🔍 Monitoring | Data quality metrics, pipeline health status, anomaly detection results, drift monitoring, task duration trends |
+| 📊 Overview | KPI cards (total requests, avg daily, forecast avg, active anomalies), daily volume trends, day-of-week patterns |
+| 🔮 Forecasts | 7-day forecast with confidence intervals, forecast summary, prediction vs actual scatter plot |
+| 🔍 Monitoring | Data quality metrics & pass rate by layer, citywide anomaly results/rate, forecast drift monitoring |
+| 🛠️ Operations | Tactical view for ops managers: backlog & aging buckets, forecast vs. capacity with staffing flags, week-over-week demand shift, per-type anomaly drill-down, data-freshness indicator |
 
 **Setup:** See `docs/databricks-dashboard-setup.md` for manual setup or run `dashboards/setup_dashboard.py` for automated creation.
 
