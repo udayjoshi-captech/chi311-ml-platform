@@ -44,6 +44,7 @@ For each query in `dashboards/queries.sql`:
 - Overview tab: 4 queries
 - Forecasts tab: 4 queries  
 - Monitoring tab: 7 queries
+- Operations tab: 8 queries (tactical view — see Tab 4 below)
 
 ### Step 3: Add Visualizations to Dashboard
 
@@ -148,6 +149,88 @@ For each query in `dashboards/queries.sql`:
    - Y-axis: `task_name`
    - Title: "Average Task Execution Time"
 
+#### Tab 4: Operations
+
+Tactical view for **ops managers and dispatchers** — answers "what do I act on
+today / this week?" (backlog & aging, forecast vs. normal capacity, and what's
+driving anomalies). All queries are in `dashboards/queries.sql` as Query 4.x.
+
+> **Prerequisite:** Query 4.7 reads `chi311.gold.gold_anomaly_results_by_type`,
+> which is created by the `ml_training` job (`04_ml/02_anomaly_detection.py`).
+> Build that widget **after** the job has run at least once, or it will error
+> with "table not found".
+
+1. **Counter Strip** (Top Row — 4 Cards)
+   - Queries: `4.1a` (Open Backlog), `4.1b` (Open >14 Days), `4.1c` (Oldest Open),
+     `4.8` (Data Through)
+   - Visualization: Counter for each
+   - **Conditional formatting:**
+     - `4.1b` Open >14 Days → **red** (this is the escalation number)
+     - `4.8` Data Through → show `days_behind` as the secondary value; **red if
+       `days_behind > 1`** (stale data — don't make staffing calls on it)
+   - Titles: self-explanatory from the `metric` column
+
+2. **Backlog by Age Bucket** (Half Width)
+   - Query: `4.2`
+   - Visualization: Bar Chart
+   - X-axis: `age_bucket` (labels `1. 0-3 days` … `4. 15+ days` — the numeric
+     prefix makes the default alphabetical axis sort render in age order)
+   - Y-axis: `open_requests`
+   - Enable data labels. Optional: Color by `age_bucket`, set `4. 15+ days` red.
+   - Title: "Open Backlog by Age"
+
+3. **7-Day Forecast vs. Capacity** (Half Width)
+   - Query: `4.4`
+   - Visualization: Table
+   - Columns: `forecast_date`, `day_of_week`, `forecast_requests`,
+     `typical_requests`, `pct_vs_typical`, `staffing_flag`
+   - **Conditional formatting** on `staffing_flag` (text-is-exactly rules):
+     - `ADD CREWS (+15% or more)` → amber/red background
+     - `LIGHT DAY (-15% or more)` → blue background
+     - `NORMAL` → no fill
+   - Color-scale `pct_vs_typical` (red high / blue low)
+   - Title: "7-Day Forecast vs. Normal Capacity"
+
+4. **Aging Backlog by Request Type** (Full Width — escalation table)
+   - Query: `4.3`
+   - Visualization: Table
+   - Columns: `sr_type`, `open_requests`, `open_over_14d`, `avg_age_days`,
+     `oldest_age_days`
+   - **Conditional formatting:**
+     - `open_over_14d` → color scale white → red (worst-aged categories pop)
+     - `oldest_age_days` → color scale white → red
+   - Already sorted by `open_over_14d DESC` in SQL
+   - Title: "Aging Backlog by Request Type"
+
+5. **Request-Type Mix: This Week vs. Last** (Half Width)
+   - Query: `4.5`
+   - Visualization: Table (or horizontal Bar of `this_week` by `sr_type`)
+   - Columns: `sr_type`, `this_week`, `last_week`, `change`, `pct_change`
+   - **Conditional formatting:** diverging color scale on `pct_change` and
+     `change` (blue = falling demand, red = rising) to surface movers
+   - Note: `pct_change` is blank for brand-new types (no last-week baseline)
+   - Title: "Request-Type Demand Shift (WoW)"
+
+6. **Citywide Anomalies with Magnitude** (Half Width)
+   - Query: `4.6`
+   - Visualization: Table
+   - Columns: `date`, `day_of_week`, `actual_requests`, `typical_requests`,
+     `pct_vs_typical`, `methods_agree`, `zscore_anomaly`, `dod_anomaly`,
+     `forecast_anomaly`
+   - **Conditional formatting:** diverging scale on `pct_vs_typical`; highlight
+     `methods_agree = 3` darker than `2`
+   - Title: "Recent Citywide Anomalies"
+
+7. **Request Types Driving Anomalies** (Full Width — the real drill-down)
+   - Query: `4.7` (requires `gold_anomaly_results_by_type` — see prerequisite)
+   - Visualization: Table
+   - Columns: `date`, `sr_type`, `requests`, `z_score`, `dod_pct_change`,
+     `zscore_anomaly`, `dod_anomaly`
+   - **Conditional formatting:** color-scale `z_score` by magnitude (rules:
+     `>= 2` red, `<= -2` blue); diverging scale on `dod_pct_change`
+   - Sorted by most recent date then largest |z-score|
+   - Title: "What Spiked: Per-Type Anomalies (30 Days)"
+
 ### Step 4: Configure Refresh Schedules
 
 1. Click dashboard **Settings** (gear icon)
@@ -156,6 +239,7 @@ For each query in `dashboards/queries.sql`:
    - **Overview Tab**: Every 1 hour
    - **Forecasts Tab**: Every 6 hours
    - **Monitoring Tab**: Every 30 minutes
+   - **Operations Tab**: Every 30 minutes (backlog is time-sensitive)
 
 ### Step 5: Set Permissions
 
@@ -221,6 +305,26 @@ Add global filters for interactive exploration:
 |        Model Drift              |   Task Duration Trends       |
 |      (Line Chart)               |    (Horizontal Bar)          |
 +----------------------------------+-------------------------------+
+```
+
+### Operations Tab Layout
+```
++------------------+------------------+------------------+------------------+
+| Open Backlog     | Open >14 Days    | Oldest Open      | Data Through     |
+| (Counter)        | (Counter, red)   | (Counter)        | (Counter)        |
++----------------------------------+-------------------------------+
+|   Backlog by Age Bucket         |  7-Day Forecast vs Capacity  |
+|       (Bar Chart)               |          (Table)             |
++------------------------------------------------------------------+
+|              Aging Backlog by Request Type                       |
+|                  (Table, escalation queue)                       |
++----------------------------------+-------------------------------+
+|  Request-Type Mix (WoW)         |  Citywide Anomalies          |
+|       (Table)                   |         (Table)              |
++------------------------------------------------------------------+
+|          Request Types Driving Anomalies (drill-down)            |
+|                         (Table)                                  |
++------------------------------------------------------------------+
 ```
 
 ## Advanced Features
