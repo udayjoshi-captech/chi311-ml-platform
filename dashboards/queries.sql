@@ -76,24 +76,27 @@ WHERE request_date >= CURRENT_DATE() - INTERVAL 90 DAYS
 ORDER BY request_date;
 
 
--- Query 1.3: Day of Week Pattern (Bar Chart)
--- X-axis: day_name (sort by day_order), Y-axis: avg_requests
+-- Query 1.3: Day of Week Pattern (Bar Chart) — Monday-first
+-- X-axis: day_name, Y-axis: avg_requests.
+-- The numeric prefix ("1. Monday" … "7. Sunday") bakes chronological order into
+-- the label so alphabetical X-axis sorting renders Mon→Sun regardless of the
+-- chart's default string sort. DAYOFWEEK() returns 1=Sunday, so the
+-- ((DAYOFWEEK + 5) % 7) + 1 expression remaps to Monday=1 … Sunday=7.
 SELECT
-  CASE DAYOFWEEK(request_date)
-    WHEN 1 THEN 'Sunday'
-    WHEN 2 THEN 'Monday'
-    WHEN 3 THEN 'Tuesday'
-    WHEN 4 THEN 'Wednesday'
-    WHEN 5 THEN 'Thursday'
-    WHEN 6 THEN 'Friday'
-    WHEN 7 THEN 'Saturday'
-  END AS day_name,
-  DAYOFWEEK(request_date) AS day_order,
+  CONCAT(
+    ((DAYOFWEEK(request_date) + 5) % 7) + 1,
+    '. ',
+    DATE_FORMAT(request_date, 'EEEE')
+  ) AS day_name,
   ROUND(AVG(total_requests), 0) AS avg_requests
 FROM chi311.gold.gold_daily_service_request_summary
 WHERE request_date >= CURRENT_DATE() - INTERVAL 90 DAYS
-GROUP BY DAYOFWEEK(request_date)
-ORDER BY day_order;
+GROUP BY CONCAT(
+    ((DAYOFWEEK(request_date) + 5) % 7) + 1,
+    '. ',
+    DATE_FORMAT(request_date, 'EEEE')
+  )
+ORDER BY day_name;
 
 
 -- Query 1.4: Recent Pipeline Runs Status (Table) -- DEFERRED
