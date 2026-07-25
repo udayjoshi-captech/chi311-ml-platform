@@ -13,12 +13,24 @@
 --     month_num, year_num
 --   gold_forecasts (04_ml/01_forecasting.py)
 --     ds, yhat, yhat_lower, yhat_upper, prediction_date, model_version
---   gold_anomaly_results (04_ml/02_anomaly_detection.py)
+--   gold_anomaly_results (04_ml/02_anomaly_detection.py) -- CITYWIDE, one row/day
 --     ds, y, anomaly_score, is_anomaly, zscore_anomaly, dod_anomaly,
 --     forecast_anomaly, detection_timestamp
+--   gold_anomaly_results_by_type (04_ml/02_anomaly_detection.py) -- per sr_type/day
+--     ds, sr_type, y, z_score, dod_pct_change, zscore_anomaly, dod_anomaly,
+--     anomaly_score, is_anomaly, detection_timestamp
+--     (z-score + day-over-day only; types averaging >= 20/day; no forecast method)
 --   dq_checkpoint_results (03_data_quality/01_data_quality_checks.py)
 --     run_date, layer, success, expectations_evaluated, expectations_passed,
 --     expectations_failed, pass_rate_pct, logged_at
+--   silver_current_311_requests (Lakeflow pipeline — current SCD2 state)
+--     sr_number, sr_type, sr_short_code, status, street_address, city,
+--     zip_code, ward, community_area, latitude, longitude, created_date,
+--     closed_date, last_modified_date, owner_department, is_info_call,
+--     is_admin_ward_info_call, valid_from, valid_to
+--   gold_request_type_daily_summary (Lakeflow pipeline)
+--     request_date, sr_type, sr_short_code, total_requests, completed_count,
+--     avg_resolution_hours
 --
 -- NOT YET AVAILABLE (tables not created because PipelineMetrics /
 -- PredictionLogger are not called from any notebook):
@@ -290,9 +302,218 @@ ORDER BY f.ds;
 
 
 -- =========================================================================
+-- TAB 4: OPERATIONS - Tactical view for ops managers & dispatchers
+-- =========================================================================
+-- Answers "what do I act on today/this week?" — backlog & aging, forecast
+-- vs. normal capacity, and anomaly context. Backlog queries read the current
+-- SCD2 state (silver_current_311_requests) so an "open" request is one whose
+-- latest version has status = 'Open'. Info calls are excluded throughout.
+--
+-- ANOMALY DRILL-DOWN: gold_anomaly_results is CITYWIDE (one row/day) — Query 4.6
+-- charts its magnitude vs. a trailing baseline. For "which type spiked",
+-- 02_anomaly_detection.py now also produces gold_anomaly_results_by_type
+-- (per sr_type/day, z-score + day-over-day, types averaging >= 20/day), which
+-- Query 4.7 uses for a real per-type drill-down. Ward-level detection is not
+-- yet implemented (would be a gold_anomaly_results_by_ward follow-up).
+
+
+-- Query 4.1a: Open Backlog (Counter)
+-- Total currently-open service requests (excludes info calls).
+SELECT
+  'Open Requests (Backlog)' AS metric,
+  COUNT(*) AS value
+FROM chi311.silver.silver_current_311_requests
+WHERE status = 'Open'
+  AND is_info_call = FALSE;
+
+-- Query 4.1b: Aged Backlog >14 Days (Counter)
+-- The "escalate today" list — open requests older than 14 days.
+SELECT
+  'Open >14 Days' AS metric,
+  COUNT(*) AS value
+FROM chi311.silver.silver_current_311_requests
+WHERE status = 'Open'
+  AND is_info_call = FALSE
+  AND created_date < CURRENT_DATE() - INTERVAL 14 DAYS;
+
+-- Query 4.1c: Oldest Open Request Age in Days (Counter)
+SELECT
+  'Oldest Open (Days)' AS metric,
+  MAX(DATEDIFF(CURRENT_DATE(), DATE(created_date))) AS value
+FROM chi311.silver.silver_current_311_requests
+WHERE status = 'Open'
+  AND is_info_call = FALSE;
+
+
+-- Query 4.2: Backlog by Age Bucket (Bar Chart) -- #3 backlog/aging
+-- X-axis: age_bucket (order baked into the label so it sorts correctly),
+-- Y-axis: open_requests. The 15d+ bucket is the tactical escalation queue.
+SELECT
+  CASE
+    WHEN DATEDIFF(CURRENT_DATE(), DATE(created_date)) <= 3  THEN '1. 0-3 days'
+    WHEN DATEDIFF(CURRENT_DATE(), DATE(created_date)) <= 7  THEN '2. 4-7 days'
+    WHEN DATEDIFF(CURRENT_DATE(), DATE(created_date)) <= 14 THEN '3. 8-14 days'
+    ELSE '4. 15+ days'
+  END AS age_bucket,
+  COUNT(*) AS open_requests
+FROM chi311.silver.silver_current_311_requests
+WHERE status = 'Open'
+  AND is_info_call = FALSE
+GROUP BY
+  CASE
+    WHEN DATEDIFF(CURRENT_DATE(), DATE(created_date)) <= 3  THEN '1. 0-3 days'
+    WHEN DATEDIFF(CURRENT_DATE(), DATE(created_date)) <= 7  THEN '2. 4-7 days'
+    WHEN DATEDIFF(CURRENT_DATE(), DATE(created_date)) <= 14 THEN '3. 8-14 days'
+    ELSE '4. 15+ days'
+  END
+ORDER BY age_bucket;
+
+
+-- Query 4.3: Aging Backlog by Request Type (Table with highlighting) -- #3
+-- Which categories are falling behind. Conditional-format open_over_14d to
+-- flag the worst offenders. Ranked by aged backlog first.
+SELECT
+  sr_type,
+  COUNT(*) AS open_requests,
+  SUM(CASE WHEN created_date < CURRENT_DATE() - INTERVAL 14 DAYS THEN 1 ELSE 0 END) AS open_over_14d,
+  ROUND(AVG(DATEDIFF(CURRENT_DATE(), DATE(created_date))), 1) AS avg_age_days,
+  MAX(DATEDIFF(CURRENT_DATE(), DATE(created_date))) AS oldest_age_days
+FROM chi311.silver.silver_current_311_requests
+WHERE status = 'Open'
+  AND is_info_call = FALSE
+GROUP BY sr_type
+ORDER BY open_over_14d DESC, open_requests DESC
+LIMIT 20;
+
+
+-- Query 4.4: 7-Day Forecast vs. Normal Capacity (Table) -- #1 forecast->staffing
+-- The tactical framing: not the curve, but the delta vs. what's typical.
+-- Baseline = trailing 28-day average of daily actuals. A staffing flag calls
+-- out days that run materially over/under normal.
+WITH baseline AS (
+  SELECT AVG(total_requests) AS typical_daily
+  FROM chi311.gold.gold_daily_service_request_summary
+  WHERE request_date >= CURRENT_DATE() - INTERVAL 28 DAYS
+),
+latest_forecast AS (
+  SELECT ds, yhat
+  FROM chi311.gold.gold_forecasts
+  WHERE prediction_date = (SELECT MAX(prediction_date) FROM chi311.gold.gold_forecasts)
+)
+SELECT
+  f.ds AS forecast_date,
+  DATE_FORMAT(f.ds, 'EEEE') AS day_of_week,
+  ROUND(f.yhat, 0) AS forecast_requests,
+  ROUND(b.typical_daily, 0) AS typical_requests,
+  ROUND((f.yhat - b.typical_daily) / b.typical_daily * 100, 1) AS pct_vs_typical,
+  CASE
+    WHEN (f.yhat - b.typical_daily) / b.typical_daily >  0.15 THEN 'ADD CREWS (+15% or more)'
+    WHEN (f.yhat - b.typical_daily) / b.typical_daily < -0.15 THEN 'LIGHT DAY (-15% or more)'
+    ELSE 'NORMAL'
+  END AS staffing_flag
+FROM latest_forecast f
+CROSS JOIN baseline b
+ORDER BY f.ds;
+
+
+-- Query 4.5: Request-Type Mix This Week vs Last Week (Table) -- #4 demand shift
+-- Ranked top types with week-over-week movement so dispatchers see where
+-- demand is shifting. Positive pct_change = rising demand.
+WITH this_week AS (
+  SELECT sr_type, SUM(total_requests) AS requests
+  FROM chi311.gold.gold_request_type_daily_summary
+  WHERE request_date >= CURRENT_DATE() - INTERVAL 7 DAYS
+  GROUP BY sr_type
+),
+last_week AS (
+  SELECT sr_type, SUM(total_requests) AS requests
+  FROM chi311.gold.gold_request_type_daily_summary
+  WHERE request_date >= CURRENT_DATE() - INTERVAL 14 DAYS
+    AND request_date <  CURRENT_DATE() - INTERVAL 7 DAYS
+  GROUP BY sr_type
+)
+SELECT
+  t.sr_type,
+  t.requests AS this_week,
+  COALESCE(l.requests, 0) AS last_week,
+  t.requests - COALESCE(l.requests, 0) AS change,
+  CASE
+    WHEN COALESCE(l.requests, 0) = 0 THEN NULL
+    ELSE ROUND((t.requests - l.requests) * 100.0 / l.requests, 1)
+  END AS pct_change
+FROM this_week t
+LEFT JOIN last_week l ON t.sr_type = l.sr_type
+ORDER BY t.requests DESC
+LIMIT 15;
+
+
+-- Query 4.6: Active Anomalies with Magnitude (Table with highlighting) -- #2
+-- Recent flagged days, with how far actual volume sat above/below a trailing
+-- 28-day baseline as of that day. "methods_agree" = anomaly_score (how many of
+-- the 3 detectors fired). Citywide only — see NOTE at top of tab.
+WITH scored AS (
+  SELECT
+    ds,
+    y AS actual_requests,
+    anomaly_score AS methods_agree,
+    zscore_anomaly,
+    dod_anomaly,
+    forecast_anomaly,
+    AVG(y) OVER (
+      ORDER BY ds ROWS BETWEEN 28 PRECEDING AND 1 PRECEDING
+    ) AS trailing_28d_avg
+  FROM chi311.gold.gold_anomaly_results
+)
+SELECT
+  ds AS date,
+  DATE_FORMAT(ds, 'EEEE') AS day_of_week,
+  actual_requests,
+  ROUND(trailing_28d_avg, 0) AS typical_requests,
+  ROUND((actual_requests - trailing_28d_avg) / trailing_28d_avg * 100, 1) AS pct_vs_typical,
+  methods_agree,
+  zscore_anomaly,
+  dod_anomaly,
+  forecast_anomaly
+FROM scored
+WHERE ds >= CURRENT_DATE() - INTERVAL 30 DAYS
+  AND methods_agree >= 2
+ORDER BY ds DESC;
+
+
+-- Query 4.7: Request Types Driving Recent Anomalies (Table with highlighting) -- #2 drill-down
+-- Real per-type anomaly signal from gold_anomaly_results_by_type: which request
+-- types were individually anomalous in the last 30 days, how far each sat above
+-- its own trailing behavior (z-score, day-over-day %), and which detectors
+-- fired. This is the genuine "what spiked" view (types averaging >= 20/day).
+SELECT
+  ds AS date,
+  sr_type,
+  y AS requests,
+  ROUND(z_score, 2) AS z_score,
+  ROUND(dod_pct_change * 100, 1) AS dod_pct_change,
+  zscore_anomaly,
+  dod_anomaly
+FROM chi311.gold.gold_anomaly_results_by_type
+WHERE is_anomaly = TRUE
+  AND ds >= CURRENT_DATE() - INTERVAL 30 DAYS
+ORDER BY ds DESC, ABS(z_score) DESC
+LIMIT 50;
+
+
+-- Query 4.8: Data Freshness / Trust Indicator (Counter) -- trust signal
+-- Tactically, don't act on stale data. Shows how current the daily summary is.
+SELECT
+  'Data Through' AS metric,
+  MAX(request_date) AS value,
+  DATEDIFF(CURRENT_DATE(), MAX(request_date)) AS days_behind
+FROM chi311.gold.gold_daily_service_request_summary;
+
+
+-- =========================================================================
 -- REFRESH SCHEDULE RECOMMENDATIONS
 -- =========================================================================
--- Tab 1 (Overview): Refresh every 1 hour
--- Tab 2 (Forecasts): Refresh every 6 hours (or when ML job completes)
--- Tab 3 (Monitoring): Refresh every 30 minutes
+-- Tab 1 (Overview):    Refresh every 1 hour
+-- Tab 2 (Forecasts):   Refresh every 6 hours (or when ML job completes)
+-- Tab 3 (Monitoring):  Refresh every 30 minutes
+-- Tab 4 (Operations):  Refresh every 30 minutes (backlog is time-sensitive)
 -- =========================================================================
