@@ -245,12 +245,29 @@ display(spark.createDataFrame(forecast_next))
 
 # COMMAND -----------
 
-# Save predictions to Gold layer
-df_predictions = spark.createDataFrame(forecast_next)
+# Save predictions to Gold layer.
+# Map Prophet's output columns (ds/yhat/...) to the gold_forecasts table schema
+# so the append matches the existing Delta table exactly:
+#   forecast_date, predicted_requests, prediction_lower, prediction_upper,
+#   prediction_generated_at, model_name, model_version
 df_predictions = (
-    df_predictions
-    .withColumn("prediction_date", F.current_timestamp())
+    spark.createDataFrame(forecast_next)
+    .withColumnRenamed("ds", "forecast_date")
+    .withColumnRenamed("yhat", "predicted_requests")
+    .withColumnRenamed("yhat_lower", "prediction_lower")
+    .withColumnRenamed("yhat_upper", "prediction_upper")
+    .withColumn("prediction_generated_at", F.current_timestamp())
+    .withColumn("model_name", F.lit(MODEL_NAME))
     .withColumn("model_version", F.lit(model_version.version))
+    .select(
+        "forecast_date",
+        "predicted_requests",
+        "prediction_lower",
+        "prediction_upper",
+        "prediction_generated_at",
+        "model_name",
+        "model_version",
+    )
 )
 
 df_predictions.write.mode("append").saveAsTable(f"{CATALOG}.gold.gold_forecasts")

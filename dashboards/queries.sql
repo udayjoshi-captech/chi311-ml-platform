@@ -12,7 +12,8 @@
 --     unique_wards, unique_community_areas, day_of_week_num, is_weekend,
 --     month_num, year_num
 --   gold_forecasts (04_ml/01_forecasting.py)
---     ds, yhat, yhat_lower, yhat_upper, prediction_date, model_version
+--     forecast_date, predicted_requests, prediction_lower, prediction_upper,
+--     prediction_generated_at, model_name, model_version
 --   gold_anomaly_results (04_ml/02_anomaly_detection.py) -- CITYWIDE, one row/day
 --     ds, y, anomaly_score, is_anomaly, zscore_anomaly, dod_anomaly,
 --     forecast_anomaly, detection_timestamp
@@ -65,9 +66,9 @@ WHERE request_date >= CURRENT_DATE() - INTERVAL 30 DAYS;
 -- the most recent forecast run instead.
 SELECT
   'Avg Forecast (Next 7 Days)' AS metric,
-  ROUND(AVG(yhat), 0) AS value
+  ROUND(AVG(predicted_requests), 0) AS value
 FROM chi311.gold.gold_forecasts
-WHERE prediction_date = (SELECT MAX(prediction_date) FROM chi311.gold.gold_forecasts);
+WHERE prediction_generated_at = (SELECT MAX(prediction_generated_at) FROM chi311.gold.gold_forecasts);
 
 -- Query 1.1d: Active Anomalies Last 7 Days (Counter)
 SELECT
@@ -129,56 +130,56 @@ ORDER BY day_name;
 -- Query 2.1: Latest Forecast + Confidence Interval vs Recent Actuals (Line Chart)
 -- Multi-series: actual (historical), predicted, lower/upper bounds.
 -- Forecasts come from gold_forecasts; actuals from the daily summary
--- (request_date aliased to ds for the join).
+-- (request_date aliased to forecast_date for the join).
 WITH latest_forecast AS (
-  SELECT ds, yhat, yhat_lower, yhat_upper
+  SELECT forecast_date, predicted_requests, prediction_lower, prediction_upper
   FROM chi311.gold.gold_forecasts
-  WHERE prediction_date = (SELECT MAX(prediction_date) FROM chi311.gold.gold_forecasts)
+  WHERE prediction_generated_at = (SELECT MAX(prediction_generated_at) FROM chi311.gold.gold_forecasts)
 ),
 recent_actuals AS (
-  SELECT request_date AS ds, total_requests AS actual
+  SELECT request_date AS forecast_date, total_requests AS actual
   FROM chi311.gold.gold_daily_service_request_summary
   WHERE request_date >= CURRENT_DATE() - INTERVAL 30 DAYS
 )
 SELECT
-  COALESCE(a.ds, f.ds) AS date,
+  COALESCE(a.forecast_date, f.forecast_date) AS date,
   a.actual,
-  f.yhat        AS predicted,
-  f.yhat_lower  AS lower_bound,
-  f.yhat_upper  AS upper_bound,
-  CASE WHEN a.ds IS NOT NULL THEN 'Historical' ELSE 'Forecast' END AS data_type
+  f.predicted_requests AS predicted,
+  f.prediction_lower   AS lower_bound,
+  f.prediction_upper   AS upper_bound,
+  CASE WHEN a.forecast_date IS NOT NULL THEN 'Historical' ELSE 'Forecast' END AS data_type
 FROM recent_actuals a
-FULL OUTER JOIN latest_forecast f ON a.ds = f.ds
+FULL OUTER JOIN latest_forecast f ON a.forecast_date = f.forecast_date
 ORDER BY date;
 
 
 -- Query 2.2: Forecast Summary Table
 SELECT
-  ds AS forecast_date,
-  ROUND(yhat, 0)       AS predicted_requests,
-  ROUND(yhat_lower, 0) AS lower_bound,
-  ROUND(yhat_upper, 0) AS upper_bound,
-  ROUND(yhat_upper - yhat_lower, 0) AS uncertainty_range,
+  forecast_date,
+  ROUND(predicted_requests, 0) AS predicted_requests,
+  ROUND(prediction_lower, 0)   AS lower_bound,
+  ROUND(prediction_upper, 0)   AS upper_bound,
+  ROUND(prediction_upper - prediction_lower, 0) AS uncertainty_range,
   model_version,
-  DATE_FORMAT(prediction_date, 'yyyy-MM-dd HH:mm:ss') AS generated_at
+  DATE_FORMAT(prediction_generated_at, 'yyyy-MM-dd HH:mm:ss') AS generated_at
 FROM chi311.gold.gold_forecasts
-WHERE prediction_date = (SELECT MAX(prediction_date) FROM chi311.gold.gold_forecasts)
-ORDER BY ds;
+WHERE prediction_generated_at = (SELECT MAX(prediction_generated_at) FROM chi311.gold.gold_forecasts)
+ORDER BY forecast_date;
 
 
 -- Query 2.3: Prediction vs Actual Comparison (Scatter Plot)
 -- X-axis: actual, Y-axis: predicted. Points near the y=x line are accurate.
--- Joins gold_forecasts to actuals on ds = request_date.
+-- Joins gold_forecasts to actuals on forecast_date = request_date.
 SELECT
   a.total_requests AS actual,
-  f.yhat           AS predicted,
-  ROUND(ABS(a.total_requests - f.yhat) / a.total_requests * 100, 1) AS error_pct,
-  f.ds AS date
+  f.predicted_requests AS predicted,
+  ROUND(ABS(a.total_requests - f.predicted_requests) / a.total_requests * 100, 1) AS error_pct,
+  f.forecast_date AS date
 FROM chi311.gold.gold_forecasts f
 INNER JOIN chi311.gold.gold_daily_service_request_summary a
-  ON f.ds = a.request_date
+  ON f.forecast_date = a.request_date
 WHERE a.total_requests > 0
-ORDER BY f.ds DESC
+ORDER BY f.forecast_date DESC
 LIMIT 100;
 
 
@@ -261,14 +262,14 @@ ORDER BY week;
 -- Uses gold_forecasts vs actuals (no pipeline_run_log needed). Add a reference
 -- line at 20 for the drift threshold.
 SELECT
-  f.ds AS date,
-  ROUND(ABS(a.total_requests - f.yhat) / a.total_requests * 100, 2) AS mape_percent,
+  f.forecast_date AS date,
+  ROUND(ABS(a.total_requests - f.predicted_requests) / a.total_requests * 100, 2) AS mape_percent,
   20.0 AS drift_threshold
 FROM chi311.gold.gold_forecasts f
 INNER JOIN chi311.gold.gold_daily_service_request_summary a
-  ON f.ds = a.request_date
+  ON f.forecast_date = a.request_date
 WHERE a.total_requests > 0
-ORDER BY f.ds;
+ORDER BY f.forecast_date;
 
 
 -- -------------------------------------------------------------------------
@@ -396,24 +397,24 @@ WITH baseline AS (
   WHERE request_date >= CURRENT_DATE() - INTERVAL 28 DAYS
 ),
 latest_forecast AS (
-  SELECT ds, yhat
+  SELECT forecast_date, predicted_requests
   FROM chi311.gold.gold_forecasts
-  WHERE prediction_date = (SELECT MAX(prediction_date) FROM chi311.gold.gold_forecasts)
+  WHERE prediction_generated_at = (SELECT MAX(prediction_generated_at) FROM chi311.gold.gold_forecasts)
 )
 SELECT
-  f.ds AS forecast_date,
-  DATE_FORMAT(f.ds, 'EEEE') AS day_of_week,
-  ROUND(f.yhat, 0) AS forecast_requests,
+  f.forecast_date,
+  DATE_FORMAT(f.forecast_date, 'EEEE') AS day_of_week,
+  ROUND(f.predicted_requests, 0) AS forecast_requests,
   ROUND(b.typical_daily, 0) AS typical_requests,
-  ROUND((f.yhat - b.typical_daily) / b.typical_daily * 100, 1) AS pct_vs_typical,
+  ROUND((f.predicted_requests - b.typical_daily) / b.typical_daily * 100, 1) AS pct_vs_typical,
   CASE
-    WHEN (f.yhat - b.typical_daily) / b.typical_daily >  0.15 THEN 'ADD CREWS (+15% or more)'
-    WHEN (f.yhat - b.typical_daily) / b.typical_daily < -0.15 THEN 'LIGHT DAY (-15% or more)'
+    WHEN (f.predicted_requests - b.typical_daily) / b.typical_daily >  0.15 THEN 'ADD CREWS (+15% or more)'
+    WHEN (f.predicted_requests - b.typical_daily) / b.typical_daily < -0.15 THEN 'LIGHT DAY (-15% or more)'
     ELSE 'NORMAL'
   END AS staffing_flag
 FROM latest_forecast f
 CROSS JOIN baseline b
-ORDER BY f.ds;
+ORDER BY f.forecast_date;
 
 
 -- Query 4.5: Request-Type Mix This Week vs Last Week (Table) -- #4 demand shift
