@@ -8,11 +8,12 @@
 # MAGIC
 # MAGIC **Cloud**: Azure Databricks with MLflow
 # MAGIC
-# MAGIC **Note**: `prophet==1.1.6` is installed as a task library (see
-# MAGIC `databricks.yml`), so no notebook-scoped `%pip` / `%restart_python` is
-# MAGIC needed. Installing before the kernel starts avoids the intermittent
-# MAGIC Stan-backend init failure that `%pip` + `%restart_python` caused. 1.1.6
-# MAGIC also tightens the transitive `holidays` pin (a drift source in 1.1.5).
+# MAGIC **Note**: `cmdstanpy==1.2.4` and `prophet==1.1.6` are installed as task
+# MAGIC libraries (see `databricks.yml`), so no notebook-scoped `%pip` /
+# MAGIC `%restart_python` is needed. cmdstanpy is pinned deliberately: prophet
+# MAGIC 1.1.6 bundles a prebuilt Stan binary that cmdstanpy 1.3.0's stricter path
+# MAGIC validation rejects, which surfaces as the misleading
+# MAGIC "'Prophet' object has no attribute 'stan_backend'". 1.2.4 loads it.
 
 # COMMAND -----------
 
